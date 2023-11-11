@@ -95,6 +95,7 @@ pub fn execute_make_swap(
         complete_timestamp: None,
         create_timestamp: env.block.time.seconds(),
         min_bid_price: msg.min_bid_price,
+        vesting_details: msg.vesting_details,
     };
     append_atomic_order(deps.storage, &order_id, &new_order)?;
 
@@ -174,7 +175,11 @@ pub fn execute_take_swap(
         &order.maker.sell_token.amount,
         order.maker.sell_token.denom.clone(),
     );
-    submsg.push(send_tokens(&taker_address, taker_send)?);
+    if let Some(val) = order.vesting_details {
+        // Call to vesting contract
+    } else {
+        submsg.push(send_tokens(&taker_address, taker_send)?);
+    }
     submsg.push(send_tokens(&treasury, taker_fee)?);
 
     order.status = Status::Complete;
@@ -364,11 +369,31 @@ pub fn execute_take_bid(
     let maker_address = deps.api.addr_validate(&order.maker.maker_address)?;
     let taker_receiving_address = deps.api.addr_validate(&bid.bidder)?;
 
-    let mut submsg: Vec<SubMsg> = vec![send_tokens(
-        &taker_receiving_address,
-        order.maker.sell_token.clone(),
-    )?];
-    submsg.push(send_tokens(&maker_address, bid.bid.clone())?);
+    // Maker fees
+    let (maker_fee, maker_send, treasury) =
+        maker_fee(deps.as_ref(), &bid.bid.amount, bid.bid.denom.clone());
+
+    let mut submsg = vec![send_tokens(&maker_address, maker_send)?];
+    submsg.push(send_tokens(&treasury, maker_fee)?);
+
+    // Taker fees
+    let (taker_fee, taker_send, treasury) = taker_fee(
+        deps.as_ref(),
+        &order.maker.sell_token.amount,
+        order.maker.sell_token.denom.clone(),
+    );
+    if let Some(val) = order.vesting_details {
+        // Call to vesting contract
+    } else {
+        submsg.push(send_tokens(&taker_receiving_address, taker_send)?);
+    }
+    submsg.push(send_tokens(&treasury, taker_fee)?);
+
+    // let mut submsg: Vec<SubMsg> = vec![send_tokens(
+    //     &taker_receiving_address,
+    //     order.maker.sell_token.clone(),
+    // )?];
+    // submsg.push(send_tokens(&maker_address, bid.bid.clone())?);
 
     let take_msg: TakeSwapMsg = TakeSwapMsg {
         order_id: order.id.clone(),
@@ -1253,6 +1278,7 @@ mod tests {
             expiration_timestamp: env.block.time.plus_seconds(100).nanos(),
             take_bids: false,
             min_bid_price: None,
+            vesting_details: None,
         };
         let err = execute(deps.as_mut(), env, info, ExecuteMsg::MakeSwap(create)).unwrap_err();
         assert_eq!(err, ContractError::EmptyBalance {});
@@ -1284,6 +1310,7 @@ mod tests {
             expiration_timestamp: 1693399749000000000,
             take_bids: false,
             min_bid_price: None,
+            vesting_details: None,
         };
 
         let path = order_path(
