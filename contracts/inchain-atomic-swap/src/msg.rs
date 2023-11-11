@@ -69,6 +69,34 @@ pub struct AtomicSwapPacketData {
     pub memo: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VestingDetails {
+    // cliff timestamp: after this timestamp vesting will start
+    pub cliff: u64,
+    // total time for which token will release
+    pub vested_time: u64,
+    // Interval after which tokens will be released
+    // vested_time % release_interval should be 0
+    pub release_interval: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VestingDetailsCall {
+    // cliff timestamp: after this timestamp vesting will start
+    pub cliff: u64,
+    // total time for which token will release
+    pub vested_time: u64,
+    // Interval after which tokens will be released
+    // vested_time % release_interval should be 0
+    pub release_interval: u64,
+    // token receiver, can claim tokens
+    pub receiver: String,
+    // total amount of tokens,
+    pub token: Coin,
+    // total claimed
+    pub amount_claimed: Uint128,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]
 pub struct MakeSwapMsg {
     /// the tokens to be sold
@@ -84,6 +112,8 @@ pub struct MakeSwapMsg {
     /// Minimum price required to create bid for this order.
     pub min_bid_price: Option<Uint128>,
     pub expiration_timestamp: u64,
+    /// None if vesting is disabled
+    pub vesting_details: Option<VestingDetails>,
 }
 
 impl fmt::Display for MakeSwapMsg {
