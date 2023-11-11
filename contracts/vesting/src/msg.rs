@@ -22,7 +22,7 @@ pub struct MigrateMsg {}
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// Returns all claims details
-    QueryClaims { address: String },
+    // QueryClaims { address: String },
     /// Returns all vesting details
     QueryVestingDetails { address: String },
     /// Returns config

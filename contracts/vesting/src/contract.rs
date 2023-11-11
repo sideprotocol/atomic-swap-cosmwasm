@@ -129,9 +129,9 @@ pub fn execute_claim(
     env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
-    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, info.sender.to_string())?;
+    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, info.sender.clone().to_string())?;
     let mut new_vesting = vec![];
-    let mut send_msg;
+    let mut send_msg = vec![];
 
     for mut vesting in vesting_details {
         let now = env.block.time.seconds();
@@ -148,24 +148,24 @@ pub fn execute_claim(
             let send_amount = release_amount.checked_mul(release_count as u128).unwrap();
             let final_amount = send_amount - vesting.amount_claimed.u128();
 
-            send_msg = BankMsg::Send {
-                to_address: info.sender.into(),
+            send_msg.push(BankMsg::Send {
+                to_address: info.sender.to_string(),
                 amount: vec![Coin {
-                    denom: vesting.token.denom,
+                    denom: vesting.token.denom.clone(),
                     amount: Uint128::from(final_amount),
                 }],
-            };
+            });
 
             vesting.amount_claimed += Uint128::from(final_amount);
         }
         new_vesting.push(vesting);
     }
 
-    VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &new_vesting);
+    VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &new_vesting)?;
 
     let res = Response::new()
         .add_attribute("action", "claim_tokens")
-        .add_message(send_msg);
+        .add_messages(send_msg);
     Ok(res)
 }
 
@@ -188,9 +188,9 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::QueryClaims { address } => to_binary(&query_claims(deps, address)?),
+        //QueryMsg::QueryClaims { address } => to_binary(&query_claims(deps, address)?),
         QueryMsg::QueryConfig {} => to_binary(&query_config(deps)?),
         QueryMsg::QueryVestingDetails { address } => {
             to_binary(&query_vesting_details(deps, address)?)
@@ -198,11 +198,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
-fn query_claims(deps: Deps, address: String) -> StdResult<String> {
-    let config = CONFIG.load(deps.storage)?;
+// fn query_claims(deps: Deps, address: String) -> StdResult<String> {
+//     let config = CONFIG.load(deps.storage)?;
 
-    Ok(config.contract_address)
-}
+//     Ok(config.contract_address)
+// }
 
 fn query_vesting_details(deps: Deps, address: String) -> StdResult<Vec<VestingDetails>> {
     let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, address)?;
