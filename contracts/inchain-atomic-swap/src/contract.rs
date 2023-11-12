@@ -2,16 +2,17 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
-    SubMsg, Timestamp,
+    SubMsg, Timestamp, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
+use crate::msg::VestingExecuteMsg::StartVesting;
 use crate::msg::{
     BidOffset, BidOffsetTime, BidsResponse, CancelBidMsg, CancelSwapMsg, DetailsResponse,
     ExecuteMsg, InstantiateMsg, ListResponse, MakeBidMsg, MakeSwapMsg, MigrateMsg, QueryMsg,
-    TakeBidMsg, TakeSwapMsg,
+    TakeBidMsg, TakeSwapMsg, VestingDetails,
 };
 use crate::query_reverse::{
     query_list_by_desired_taker_reverse, query_list_by_maker_reverse, query_list_by_taker_reverse,
@@ -19,8 +20,8 @@ use crate::query_reverse::{
 };
 use crate::state::{
     append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
-    AtomicSwapOrder, Bid, BidKey, BidStatus, Status, COUNT, INACTIVE_COUNT, INACTIVE_SWAP_ORDERS,
-    ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
+    AtomicSwapOrder, Bid, BidKey, BidStatus, Config, Status, CONFIG, COUNT, INACTIVE_COUNT,
+    INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
 };
 use crate::utils::{maker_fee, send_tokens, taker_fee};
 use cw_storage_plus::Bound;
@@ -33,13 +34,20 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
-    _msg: InstantiateMsg,
+    info: MessageInfo,
+    msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     COUNT.save(deps.storage, &0u64)?;
     INACTIVE_COUNT.save(deps.storage, &0u64)?;
     SWAP_SEQUENCE.save(deps.storage, &0u64)?;
+    CONFIG.save(
+        deps.storage,
+        &Config {
+            admin: info.sender.to_string(),
+            vesting_contract: msg.vesting_contract,
+        },
+    );
     Ok(Response::default())
 }
 
@@ -95,6 +103,7 @@ pub fn execute_make_swap(
         complete_timestamp: None,
         create_timestamp: env.block.time.seconds(),
         min_bid_price: msg.min_bid_price,
+        vesting_details: msg.vesting_details,
     };
     append_atomic_order(deps.storage, &order_id, &new_order)?;
 
@@ -174,7 +183,31 @@ pub fn execute_take_swap(
         &order.maker.sell_token.amount,
         order.maker.sell_token.denom.clone(),
     );
-    submsg.push(send_tokens(&taker_address, taker_send)?);
+    if let Some(val) = order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
+        // Call to vesting contract
+        let vesting_call = VestingDetails {
+            cliff: val.cliff,
+            vested_time: val.vested_time,
+            release_interval: val.release_interval,
+            receiver: taker_address.to_string(),
+            token: taker_send.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+        };
+
+        // log message
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting_contract,
+            msg: to_binary(&vesting_msg)?,
+            funds: vec![taker_send],
+        }));
+    } else {
+        submsg.push(send_tokens(&taker_address, taker_send)?);
+    }
     submsg.push(send_tokens(&treasury, taker_fee)?);
 
     order.status = Status::Complete;
@@ -364,11 +397,45 @@ pub fn execute_take_bid(
     let maker_address = deps.api.addr_validate(&order.maker.maker_address)?;
     let taker_receiving_address = deps.api.addr_validate(&bid.bidder)?;
 
-    let mut submsg: Vec<SubMsg> = vec![send_tokens(
-        &taker_receiving_address,
-        order.maker.sell_token.clone(),
-    )?];
-    submsg.push(send_tokens(&maker_address, bid.bid.clone())?);
+    // Maker fees
+    let (maker_fee, maker_send, treasury) =
+        maker_fee(deps.as_ref(), &bid.bid.amount, bid.bid.denom.clone());
+
+    let mut submsg = vec![send_tokens(&maker_address, maker_send)?];
+    submsg.push(send_tokens(&treasury, maker_fee)?);
+
+    // Taker fees
+    let (taker_fee, taker_send, treasury) = taker_fee(
+        deps.as_ref(),
+        &order.maker.sell_token.amount.clone(),
+        order.maker.sell_token.denom.clone(),
+    );
+    if let Some(val) = order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
+        // Call to vesting contract
+        let vesting_call = VestingDetails {
+            cliff: val.cliff,
+            vested_time: val.vested_time,
+            release_interval: val.release_interval,
+            receiver: taker_receiving_address.to_string(),
+            token: taker_send.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+        };
+
+        // log message
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting_contract,
+            msg: to_binary(&vesting_msg)?,
+            funds: vec![taker_send],
+        }));
+    } else {
+        submsg.push(send_tokens(&taker_receiving_address, taker_send)?);
+    }
+    submsg.push(send_tokens(&treasury, taker_fee)?);
 
     let take_msg: TakeSwapMsg = TakeSwapMsg {
         order_id: order.id.clone(),
@@ -1065,7 +1132,9 @@ mod tests {
         let mut deps = mock_dependencies();
 
         // Instantiate an empty contract
-        let instantiate_msg = InstantiateMsg {};
+        let instantiate_msg = InstantiateMsg {
+            vesting_contract: "vesting-address".to_string(),
+        };
         let info = mock_info("anyone", &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
@@ -1076,7 +1145,9 @@ mod tests {
         let mut deps = mock_dependencies();
 
         // Instantiate an empty contract
-        let instantiate_msg = InstantiateMsg {};
+        let instantiate_msg = InstantiateMsg {
+            vesting_contract: "vesting-address".to_string(),
+        };
         let info = mock_info("anyone", &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
         assert_eq!(0, res.messages.len());
@@ -1236,7 +1307,15 @@ mod tests {
 
         let info = mock_info("anyone", &[]);
         let env = mock_env();
-        instantiate(deps.as_mut(), env.clone(), info, InstantiateMsg {}).unwrap();
+        instantiate(
+            deps.as_mut(),
+            env.clone(),
+            info,
+            InstantiateMsg {
+                vesting_contract: "vesting-address".to_string(),
+            },
+        )
+        .unwrap();
 
         let sender = String::from("sender0001");
         // let balance = coins(100, "tokens");
@@ -1244,7 +1323,7 @@ mod tests {
         let balance2 = coin(200, "token2");
 
         // Cannot create, no funds
-        let info = mock_info(&sender, &[]);
+        let info = mock_info(&sender, &[balance1.clone()]);
         let create = MakeSwapMsg {
             sell_token: balance1,
             buy_token: balance2,
@@ -1253,6 +1332,7 @@ mod tests {
             expiration_timestamp: env.block.time.plus_seconds(100).nanos(),
             take_bids: false,
             min_bid_price: None,
+            vesting_details: None,
         };
         let err = execute(deps.as_mut(), env, info, ExecuteMsg::MakeSwap(create)).unwrap_err();
         assert_eq!(err, ContractError::EmptyBalance {});
@@ -1264,7 +1344,15 @@ mod tests {
 
         let info = mock_info("anyone", &[]);
         let env = mock_env();
-        instantiate(deps.as_mut(), env, info, InstantiateMsg {}).unwrap();
+        instantiate(
+            deps.as_mut(),
+            env,
+            info,
+            InstantiateMsg {
+                vesting_contract: "vesting-address".to_string(),
+            },
+        )
+        .unwrap();
         // let balance = coins(100, "tokens");
         let balance1 = coin(100, "token");
         let balance2 = coin(100, "aside");
@@ -1284,6 +1372,7 @@ mod tests {
             expiration_timestamp: 1693399749000000000,
             take_bids: false,
             min_bid_price: None,
+            vesting_details: None,
         };
 
         let path = order_path(
@@ -1305,7 +1394,15 @@ mod tests {
 
         let info = mock_info("anyone", &[]);
         let env = mock_env();
-        instantiate(deps.as_mut(), env, info, InstantiateMsg {}).unwrap();
+        instantiate(
+            deps.as_mut(),
+            env,
+            info,
+            InstantiateMsg {
+                vesting_contract: "vesting-address".to_string(),
+            },
+        )
+        .unwrap();
         // let balance = coins(100, "tokens");
         let balance2 = coin(100, "aside");
         let taker_address = String::from("side1lqd386kze5355mgpncu5y52jcdhs85ckj7kdv0");
