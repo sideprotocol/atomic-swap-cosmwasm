@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
+    to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
     SubMsg, Timestamp, Uint128, WasmMsg,
 };
 
@@ -47,7 +47,7 @@ pub fn instantiate(
             admin: info.sender.to_string(),
             vesting_contract: msg.vesting_contract,
         },
-    );
+    )?;
     Ok(Response::default())
 }
 
@@ -202,7 +202,7 @@ pub fn execute_take_swap(
         // log message
         submsg.push(SubMsg::new(WasmMsg::Execute {
             contract_addr: cfg.vesting_contract,
-            msg: to_binary(&vesting_msg)?,
+            msg: to_json_binary(&vesting_msg)?,
             funds: vec![taker_send],
         }));
     } else {
@@ -429,7 +429,7 @@ pub fn execute_take_bid(
         // log message
         submsg.push(SubMsg::new(WasmMsg::Execute {
             contract_addr: cfg.vesting_contract,
-            msg: to_binary(&vesting_msg)?,
+            msg: to_json_binary(&vesting_msg)?,
             funds: vec![taker_send],
         }));
     } else {
@@ -522,12 +522,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
             order,
-        } => to_binary(&query_list(deps, start_after, limit, order)?),
+        } => to_json_binary(&query_list(deps, start_after, limit, order)?),
         QueryMsg::ListByDesiredTaker {
             start_after,
             limit,
             desired_taker,
-        } => to_binary(&query_list_by_desired_taker(
+        } => to_json_binary(&query_list_by_desired_taker(
             deps,
             start_after,
             limit,
@@ -537,20 +537,20 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
             maker,
-        } => to_binary(&query_list_by_maker(deps, start_after, limit, maker)?),
+        } => to_json_binary(&query_list_by_maker(deps, start_after, limit, maker)?),
         QueryMsg::ListByTaker {
             start_after,
             limit,
             taker,
-        } => to_binary(&query_list_by_taker(deps, start_after, limit, taker)?),
-        QueryMsg::Details { id } => to_binary(&query_details(deps, id)?),
+        } => to_json_binary(&query_list_by_taker(deps, start_after, limit, taker)?),
+        QueryMsg::Details { id } => to_json_binary(&query_details(deps, id)?),
         // Bids
         QueryMsg::BidByAmount {
             order,
             status,
             start_after,
             limit,
-        } => to_binary(&query_bids_sorted_by_amount(
+        } => to_json_binary(&query_bids_sorted_by_amount(
             deps,
             order,
             status,
@@ -562,7 +562,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             status,
             start_before,
             limit,
-        } => to_binary(&query_bids_sorted_by_amount_reverse(
+        } => to_json_binary(&query_bids_sorted_by_amount_reverse(
             deps,
             order,
             status,
@@ -574,7 +574,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             status,
             start_after,
             limit,
-        } => to_binary(&query_bids_sorted_by_order(
+        } => to_json_binary(&query_bids_sorted_by_order(
             deps,
             order,
             status,
@@ -586,20 +586,20 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             status,
             start_before,
             limit,
-        } => to_binary(&query_bids_sorted_by_order_reverse(
+        } => to_json_binary(&query_bids_sorted_by_order_reverse(
             deps,
             order,
             status,
             start_before,
             limit,
         )?),
-        QueryMsg::BidDetails { order, bidder } => to_binary(&query_bid(deps, order, bidder)?),
+        QueryMsg::BidDetails { order, bidder } => to_json_binary(&query_bid(deps, order, bidder)?),
         QueryMsg::BidByBidder {
             bidder,
             status,
             start_after,
             limit,
-        } => to_binary(&query_bids_by_bidder(
+        } => to_json_binary(&query_bids_by_bidder(
             deps,
             bidder,
             status,
@@ -612,12 +612,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
             order,
-        } => to_binary(&query_inactive_list(deps, start_after, limit, order)?),
+        } => to_json_binary(&query_inactive_list(deps, start_after, limit, order)?),
         QueryMsg::InactiveListByDesiredTaker {
             start_after,
             limit,
             desired_taker,
-        } => to_binary(&query_inactive_list_by_desired_taker(
+        } => to_json_binary(&query_inactive_list_by_desired_taker(
             deps,
             start_after,
             limit,
@@ -627,7 +627,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
             maker,
-        } => to_binary(&query_inactive_list_by_maker(
+        } => to_json_binary(&query_inactive_list_by_maker(
             deps,
             start_after,
             limit,
@@ -637,7 +637,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_after,
             limit,
             taker,
-        } => to_binary(&query_inactive_list_by_taker(
+        } => to_json_binary(&query_inactive_list_by_taker(
             deps,
             start_after,
             limit,
@@ -647,12 +647,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::ListReverse {
             start_before,
             limit,
-        } => to_binary(&query_list_reverse(deps, start_before, limit)?),
+        } => to_json_binary(&query_list_reverse(deps, start_before, limit)?),
         QueryMsg::ListByDesiredTakerReverse {
             start_before,
             limit,
             desired_taker,
-        } => to_binary(&query_list_by_desired_taker_reverse(
+        } => to_json_binary(&query_list_by_desired_taker_reverse(
             deps,
             start_before,
             limit,
@@ -662,7 +662,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_before,
             limit,
             maker,
-        } => to_binary(&query_list_by_maker_reverse(
+        } => to_json_binary(&query_list_by_maker_reverse(
             deps,
             start_before,
             limit,
@@ -672,7 +672,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             start_before,
             limit,
             taker,
-        } => to_binary(&query_list_by_taker_reverse(
+        } => to_json_binary(&query_list_by_taker_reverse(
             deps,
             start_before,
             limit,
@@ -1120,7 +1120,7 @@ fn query_inactive_list_by_taker(
 #[cfg(test)]
 mod tests {
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coin, from_binary, Coin, StdError, Uint128};
+    use cosmwasm_std::{coin, from_json, Coin, StdError, Uint128};
 
     use crate::msg::TakeSwapMsgOutput;
     use crate::utils::{generate_order_id, order_path};
@@ -1181,7 +1181,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_binary(&res).unwrap();
+        let value: BidsResponse = from_json(&res).unwrap();
         assert_eq!(value.bids[0], bid);
 
         order = "some-order".to_owned();
@@ -1212,7 +1212,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_binary(&res).unwrap();
+        let value: BidsResponse = from_json(&res).unwrap();
         assert_eq!(value.bids[0], bid);
 
         order = "some-order".to_owned();
@@ -1246,7 +1246,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_binary(&res).unwrap();
+        let value: BidsResponse = from_json(&res).unwrap();
         assert_eq!(value.bids, vec![bid2.clone(), bid1]);
 
         let res = query(
@@ -1264,7 +1264,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_binary(&res).unwrap();
+        let value: BidsResponse = from_json(&res).unwrap();
         assert_eq!(value.bids, vec![bid2, bid.clone()]);
 
         // Query by bidder
@@ -1297,7 +1297,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_binary(&res).unwrap();
+        let value: BidsResponse = from_json(&res).unwrap();
         assert_eq!(value.bids, vec![bid, bid3]);
     }
 
@@ -1415,15 +1415,15 @@ mod tests {
             taker_address,
         };
 
-        let create_bytes = to_binary(&create).unwrap();
+        let create_bytes = to_json_binary(&create).unwrap();
         println!("create_bytes is {:?}", &create_bytes.to_base64());
 
         let bytes = Binary::from_base64("eyJvcmRlcl9pZCI6ImJmNGRkODNmYzA0ZWE0YmY1NjVhMDI5NGVkMTVkMTg5ZWUyZDc2NjJhMTE3NDQyOGQzZDQ2YjQ2YWY1NWM3YTIiLCJzZWxsX3Rva2VuIjp7ImRlbm9tIjoiYXNpZGUiLCJhbW91bnQiOiIxMDAifSwidGFrZXJfYWRkcmVzcyI6InNpZGUxbHFkMzg2a3plNTM1NW1ncG5jdTV5NTJqY2Roczg1Y2tqN2tkdjAiLCJ0YWtlcl9yZWNlaXZpbmdfYWRkcmVzcyI6Indhc20xOXpsNGwyaGFmY2R3NnA5OWtjMDB6bnR0Z3BkeWszMmEwMnB1ajIiLCJ0aW1lb3V0X2hlaWdodCI6eyJyZXZpc2lvbl9udW1iZXIiOiIwIiwicmV2aXNpb25faGVpZ2h0IjoiOTk5OTk5NiJ9LCJ0aW1lb3V0X3RpbWVzdGFtcCI6IjE2OTMzOTk3OTkwMDAwMDAwMDAiLCJjcmVhdGVfdGltZXN0YW1wIjoiMTY4NDMyODUyNyJ9").unwrap();
 
         println!("bytes is {:?}", &bytes);
-        // let msg: TakeSwapMsg = from_binary(&bytes.clone()).unwrap();
+        // let msg: TakeSwapMsg = from_json(&bytes.clone()).unwrap();
 
-        let msg_res: Result<TakeSwapMsg, StdError> = from_binary(&bytes);
+        let msg_res: Result<TakeSwapMsg, StdError> = from_json(&bytes);
         let msg: TakeSwapMsg;
 
         match msg_res {
@@ -1431,7 +1431,7 @@ mod tests {
                 msg = value;
             }
             Err(_err) => {
-                let msg_output: TakeSwapMsgOutput = from_binary(&bytes).unwrap();
+                let msg_output: TakeSwapMsgOutput = from_json(&bytes).unwrap();
                 msg = TakeSwapMsg {
                     order_id: msg_output.order_id.clone(),
                     sell_token: msg_output.sell_token.clone(),
