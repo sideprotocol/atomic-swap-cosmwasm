@@ -2,16 +2,17 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdError, StdResult,
-    SubMsg, Timestamp,
+    SubMsg, Timestamp, Uint128, WasmMsg,
 };
 
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
+use crate::msg::VestingExecuteMsg::StartVesting;
 use crate::msg::{
     BidOffset, BidOffsetTime, BidsResponse, CancelBidMsg, CancelSwapMsg, DetailsResponse,
     ExecuteMsg, InstantiateMsg, ListResponse, MakeBidMsg, MakeSwapMsg, MigrateMsg, QueryMsg,
-    TakeBidMsg, TakeSwapMsg,
+    TakeBidMsg, TakeSwapMsg, VestingDetails,
 };
 use crate::query_reverse::{
     query_list_by_desired_taker_reverse, query_list_by_maker_reverse, query_list_by_taker_reverse,
@@ -19,8 +20,8 @@ use crate::query_reverse::{
 };
 use crate::state::{
     append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
-    AtomicSwapOrder, Bid, BidKey, BidStatus, Status, COUNT, INACTIVE_COUNT, INACTIVE_SWAP_ORDERS,
-    ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
+    AtomicSwapOrder, Bid, BidKey, BidStatus, Config, Status, CONFIG, COUNT, INACTIVE_COUNT,
+    INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
 };
 use crate::utils::{maker_fee, send_tokens, taker_fee};
 use cw_storage_plus::Bound;
@@ -33,13 +34,20 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
-    _msg: InstantiateMsg,
+    info: MessageInfo,
+    msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     COUNT.save(deps.storage, &0u64)?;
     INACTIVE_COUNT.save(deps.storage, &0u64)?;
     SWAP_SEQUENCE.save(deps.storage, &0u64)?;
+    CONFIG.save(
+        deps.storage,
+        &Config {
+            admin: info.sender.to_string(),
+            vesting_contract: msg.vesting_contract,
+        },
+    );
     Ok(Response::default())
 }
 
@@ -175,8 +183,28 @@ pub fn execute_take_swap(
         &order.maker.sell_token.amount,
         order.maker.sell_token.denom.clone(),
     );
-    if let Some(val) = order.vesting_details {
+    if let Some(val) = order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
         // Call to vesting contract
+        let vesting_call = VestingDetails {
+            cliff: val.cliff,
+            vested_time: val.vested_time,
+            release_interval: val.release_interval,
+            receiver: taker_address.to_string(),
+            token: taker_send.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+        };
+
+        // log message
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting_contract,
+            msg: to_binary(&vesting_msg)?,
+            funds: vec![taker_send],
+        }));
     } else {
         submsg.push(send_tokens(&taker_address, taker_send)?);
     }
@@ -379,21 +407,15 @@ pub fn execute_take_bid(
     // Taker fees
     let (taker_fee, taker_send, treasury) = taker_fee(
         deps.as_ref(),
-        &order.maker.sell_token.amount,
+        &order.maker.sell_token.amount.clone(),
         order.maker.sell_token.denom.clone(),
     );
-    if let Some(val) = order.vesting_details {
+    if let Some(val) = order.vesting_details.clone() {
         // Call to vesting contract
     } else {
         submsg.push(send_tokens(&taker_receiving_address, taker_send)?);
     }
     submsg.push(send_tokens(&treasury, taker_fee)?);
-
-    // let mut submsg: Vec<SubMsg> = vec![send_tokens(
-    //     &taker_receiving_address,
-    //     order.maker.sell_token.clone(),
-    // )?];
-    // submsg.push(send_tokens(&maker_address, bid.bid.clone())?);
 
     let take_msg: TakeSwapMsg = TakeSwapMsg {
         order_id: order.id.clone(),

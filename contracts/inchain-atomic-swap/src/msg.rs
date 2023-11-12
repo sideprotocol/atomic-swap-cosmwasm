@@ -19,7 +19,9 @@ pub struct Height {
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InstantiateMsg {}
+pub struct InstantiateMsg {
+    pub vesting_contract: String,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
@@ -70,7 +72,7 @@ pub struct AtomicSwapPacketData {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct VestingDetails {
+pub struct VestingDetail {
     // cliff timestamp: after this timestamp vesting will start
     pub cliff: u64,
     // total time for which token will release
@@ -81,7 +83,7 @@ pub struct VestingDetails {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-pub struct VestingDetailsCall {
+pub struct VestingDetails {
     // cliff timestamp: after this timestamp vesting will start
     pub cliff: u64,
     // total time for which token will release
@@ -95,6 +97,11 @@ pub struct VestingDetailsCall {
     pub token: Coin,
     // total claimed
     pub amount_claimed: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub enum VestingExecuteMsg {
+    StartVesting { vesting: VestingDetails },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]
@@ -113,7 +120,7 @@ pub struct MakeSwapMsg {
     pub min_bid_price: Option<Uint128>,
     pub expiration_timestamp: u64,
     /// None if vesting is disabled
-    pub vesting_details: Option<VestingDetails>,
+    pub vesting_details: Option<VestingDetail>,
 }
 
 impl fmt::Display for MakeSwapMsg {

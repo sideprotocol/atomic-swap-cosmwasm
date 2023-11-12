@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::msg::{MakeSwapMsg, TakeSwapMsg, VestingDetails};
+use crate::msg::{MakeSwapMsg, TakeSwapMsg, VestingDetail};
 use cosmwasm_std::{Coin, StdResult, Storage, Timestamp, Uint128};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
@@ -43,8 +43,16 @@ pub struct AtomicSwapOrder {
     pub cancel_timestamp: Option<Timestamp>,
     pub complete_timestamp: Option<Timestamp>,
     pub min_bid_price: Option<Uint128>,
-    pub vesting_details: Option<VestingDetails>,
+    pub vesting_details: Option<VestingDetail>,
 }
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct Config {
+    pub vesting_contract: String,
+    pub admin: String,
+}
+
+pub const CONFIG: Item<Config> = Item::new("config");
 
 pub const SWAP_ORDERS: Map<u64, AtomicSwapOrder> = Map::new("swap_order");
 pub const ORDER_TO_COUNT: Map<&str, u64> = Map::new("order_to_count");
