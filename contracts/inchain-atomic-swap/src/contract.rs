@@ -1181,7 +1181,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids[0], bid);
 
         order = "some-order".to_owned();
@@ -1212,7 +1212,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids[0], bid);
 
         order = "some-order".to_owned();
@@ -1246,7 +1246,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids, vec![bid2.clone(), bid1]);
 
         let res = query(
@@ -1264,7 +1264,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids, vec![bid2, bid.clone()]);
 
         // Query by bidder
@@ -1297,7 +1297,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids, vec![bid, bid3]);
     }
 
