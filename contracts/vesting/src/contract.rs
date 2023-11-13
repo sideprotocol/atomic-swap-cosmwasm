@@ -72,9 +72,13 @@ pub fn execute_start_vesting(
         ))));
     }
 
-    if vesting.vested_time % vesting.release_interval != 0 {
+    let mut total_amount = Uint128::from(0u64);
+    for schedule in vesting.schedules {
+        total_amount += schedule.amount;
+    }
+    if total_amount != vesting.token.amount {
         return Err(ContractError::Std(StdError::generic_err(format!(
-            "Remainder for vested_time / release_interval should be zero"
+                "Total amount of tokens is not equal to total vesting amount"
         ))));
     }
 
