@@ -76,7 +76,7 @@ pub fn execute_start_vesting(
     }
     if total_amount != vesting.token.amount {
         return Err(ContractError::Std(StdError::generic_err(format!(
-                "Total amount of tokens is not equal to total vesting amount"
+            "Total amount of tokens is not equal to total vesting amount"
         ))));
     }
 
