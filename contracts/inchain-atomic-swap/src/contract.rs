@@ -91,6 +91,18 @@ pub fn execute_make_swap(
         )));
     }
 
+    if let Some(val) = msg.vesting_details.clone() {
+        let mut total_amount = Uint128::from(0u64);
+        for schedule in val.schedules {
+            total_amount += schedule.amount;
+        }
+        if total_amount != msg.sell_token.amount {
+            return Err(ContractError::Std(StdError::generic_err(format!(
+                "Total amount of tokens is not equal to total vesting amount"
+            ))));
+        }
+    }
+
     let sequence = SWAP_SEQUENCE.load(deps.storage)?;
 
     let order_id = sequence.to_string();
@@ -188,8 +200,7 @@ pub fn execute_take_swap(
         // Call to vesting contract
         let vesting_call = VestingDetails {
             cliff: val.cliff + env.block.time.seconds(),
-            vested_time: val.vested_time,
-            release_interval: val.release_interval,
+            schedules: val.schedules,
             receiver: taker_address.to_string(),
             token: taker_send.clone(),
             amount_claimed: Uint128::from(0u64),
@@ -415,8 +426,7 @@ pub fn execute_take_bid(
         // Call to vesting contract
         let vesting_call = VestingDetails {
             cliff: val.cliff + env.block.time.seconds(),
-            vested_time: val.vested_time,
-            release_interval: val.release_interval,
+            schedules: val.schedules,
             receiver: taker_receiving_address.to_string(),
             token: taker_send.clone(),
             amount_claimed: Uint128::from(0u64),

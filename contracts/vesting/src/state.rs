@@ -8,17 +8,20 @@ use cw_storage_plus::{Item, Map};
 pub struct VestingDetails {
     // cliff timestamp: after this timestamp vesting will start
     pub cliff: u64,
-    // total time for which token will release
-    pub vested_time: u64,
-    // Interval after which tokens will be released
-    // vested_time % release_interval should be 0
-    pub release_interval: u64,
+    // List of intervals and amount, after each interval certain amount will be released
+    pub schedules: Vec<ReleaseInterval>,
     // token receiver, can claim tokens
     pub receiver: String,
     // total amount of tokens,
     pub token: Coin,
     // total claimed
     pub amount_claimed: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ReleaseInterval {
+    pub interval: u64,
+    pub amount: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

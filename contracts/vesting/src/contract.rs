@@ -1,5 +1,3 @@
-use std::cmp::min;
-
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -72,9 +70,13 @@ pub fn execute_start_vesting(
         ))));
     }
 
-    if vesting.vested_time % vesting.release_interval != 0 {
+    let mut total_amount = Uint128::from(0u64);
+    for schedule in vesting.schedules.clone() {
+        total_amount += schedule.amount;
+    }
+    if total_amount != vesting.token.amount {
         return Err(ContractError::Std(StdError::generic_err(format!(
-            "Remainder for vested_time / release_interval should be zero"
+            "Total amount of tokens is not equal to total vesting amount"
         ))));
     }
 
@@ -136,17 +138,17 @@ pub fn execute_claim(
     for mut vesting in vesting_details {
         let now = env.block.time.seconds();
         if vesting.cliff <= now {
-            let mut release_count = (now - vesting.cliff) / vesting.release_interval;
-            release_count += 1;
-            release_count = min(
-                release_count,
-                vesting.vested_time / vesting.release_interval,
-            );
-            let release_amount = vesting.token.amount.u128()
-                / (vesting.vested_time / vesting.release_interval) as u128;
-
-            let send_amount = release_amount.checked_mul(release_count as u128).unwrap();
-            let final_amount = send_amount - vesting.amount_claimed.u128();
+            let mut now_with_cliff = vesting.cliff;
+            let mut release_amount = Uint128::from(0u64);
+            for schedule in vesting.schedules.clone() {
+                if now_with_cliff <= now {
+                    release_amount += schedule.amount;
+                } else {
+                    break;
+                }
+                now_with_cliff += schedule.interval;
+            }
+            let final_amount = release_amount.u128() - vesting.amount_claimed.u128();
 
             send_msg.push(BankMsg::Send {
                 to_address: info.sender.to_string(),
