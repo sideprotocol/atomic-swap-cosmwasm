@@ -91,6 +91,18 @@ pub fn execute_make_swap(
         )));
     }
 
+    if let Some(val) = msg.vesting_details.clone() {
+        let mut total_amount = Uint128::from(0u64);
+        for schedule in val.schedules {
+            total_amount += schedule.amount;
+        }
+        if total_amount != msg.sell_token.amount {
+            return Err(ContractError::Std(StdError::generic_err(format!(
+                "Total amount of tokens is not equal to total vesting amount"
+            ))));
+        }
+    }
+
     let sequence = SWAP_SEQUENCE.load(deps.storage)?;
 
     let order_id = sequence.to_string();
