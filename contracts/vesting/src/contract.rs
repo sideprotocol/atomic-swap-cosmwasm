@@ -3,7 +3,7 @@ use std::cmp::min;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError,
     StdResult, Uint128,
 };
 
@@ -190,10 +190,10 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        //QueryMsg::QueryClaims { address } => to_binary(&query_claims(deps, address)?),
-        QueryMsg::QueryConfig {} => to_binary(&query_config(deps)?),
+        //QueryMsg::QueryClaims { address } => to_json_binary(&query_claims(deps, address)?),
+        QueryMsg::QueryConfig {} => to_json_binary(&query_config(deps)?),
         QueryMsg::QueryVestingDetails { address } => {
-            to_binary(&query_vesting_details(deps, address)?)
+            to_json_binary(&query_vesting_details(deps, address)?)
         }
     }
 }
