@@ -188,8 +188,7 @@ pub fn execute_take_swap(
         // Call to vesting contract
         let vesting_call = VestingDetails {
             cliff: val.cliff + env.block.time.seconds(),
-            vested_time: val.vested_time,
-            release_interval: val.release_interval,
+            schedules: val.schedules,
             receiver: taker_address.to_string(),
             token: taker_send.clone(),
             amount_claimed: Uint128::from(0u64),
@@ -415,8 +414,7 @@ pub fn execute_take_bid(
         // Call to vesting contract
         let vesting_call = VestingDetails {
             cliff: val.cliff + env.block.time.seconds(),
-            vested_time: val.vested_time,
-            release_interval: val.release_interval,
+            schedules: val.schedules,
             receiver: taker_receiving_address.to_string(),
             token: taker_send.clone(),
             amount_claimed: Uint128::from(0u64),
