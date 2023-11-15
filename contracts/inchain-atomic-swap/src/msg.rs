@@ -73,16 +73,14 @@ pub struct AtomicSwapPacketData {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VestingDetail {
-    // cliff timestamp: after this timestamp vesting will start
-    pub cliff: u64,
     // List of intervals and amount, after each interval certain amount will be released
     pub schedules: Vec<ReleaseInterval>,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VestingDetails {
-    // cliff timestamp: after this timestamp vesting will start
-    pub cliff: u64,
+    // start_time: after this timestamp vesting will start
+    pub start_time: u64,
     // List of intervals and amount, after each interval certain amount will be released
     pub schedules: Vec<ReleaseInterval>,
     // token receiver, can claim tokens

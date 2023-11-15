@@ -47,7 +47,7 @@ pub fn execute(
 
 pub fn execute_start_vesting(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     vesting: VestingDetails,
 ) -> Result<Response, ContractError> {
@@ -61,12 +61,6 @@ pub fn execute_start_vesting(
     if !ok {
         return Err(ContractError::Std(StdError::generic_err(format!(
             "Must be called by allowed address"
-        ))));
-    }
-
-    if vesting.cliff < env.block.time.seconds() {
-        return Err(ContractError::Std(StdError::generic_err(format!(
-            "Cliff time must be in future"
         ))));
     }
 
@@ -137,16 +131,16 @@ pub fn execute_claim(
 
     for mut vesting in vesting_details {
         let now = env.block.time.seconds();
-        if vesting.cliff <= now {
-            let mut now_with_cliff = vesting.cliff;
+        if vesting.start_time <= now {
+            let mut now_with_cliff = vesting.start_time;
             let mut release_amount = Uint128::from(0u64);
             for schedule in vesting.schedules.clone() {
+                now_with_cliff += schedule.interval;
                 if now_with_cliff <= now {
                     release_amount += schedule.amount;
                 } else {
                     break;
                 }
-                now_with_cliff += schedule.interval;
             }
             let final_amount = release_amount.u128() - vesting.amount_claimed.u128();
 

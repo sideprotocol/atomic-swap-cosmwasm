@@ -199,7 +199,7 @@ pub fn execute_take_swap(
         let cfg = CONFIG.load(deps.storage)?;
         // Call to vesting contract
         let vesting_call = VestingDetails {
-            cliff: val.cliff + env.block.time.seconds(),
+            start_time: env.block.time.seconds(),
             schedules: val.schedules,
             receiver: taker_address.to_string(),
             token: taker_send.clone(),
@@ -425,7 +425,7 @@ pub fn execute_take_bid(
         let cfg = CONFIG.load(deps.storage)?;
         // Call to vesting contract
         let vesting_call = VestingDetails {
-            cliff: val.cliff + env.block.time.seconds(),
+            start_time: env.block.time.seconds(),
             schedules: val.schedules,
             receiver: taker_receiving_address.to_string(),
             token: taker_send.clone(),
