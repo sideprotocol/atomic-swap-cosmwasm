@@ -10,9 +10,16 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
-    StartVesting { vesting: VestingDetails, order_id: String },
-    SetAllowed { addresses: Vec<String> },
-    Claim { order_id: String },
+    StartVesting {
+        vesting: VestingDetails,
+        order_id: String,
+    },
+    SetAllowed {
+        addresses: Vec<String>,
+    },
+    Claim {
+        order_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -24,7 +31,7 @@ pub enum QueryMsg {
     /// Returns all claims details
     // QueryClaims { address: String },
     /// Returns all vesting details
-    QueryVestingDetails { address: String },
+    QueryVestingDetails { address: String, order_id: String },
     /// Returns config
     QueryConfig {},
 }
