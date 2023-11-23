@@ -10,9 +10,9 @@ pub struct InstantiateMsg {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
-    StartVesting { vesting: VestingDetails },
+    StartVesting { vesting: VestingDetails, order_id: String },
     SetAllowed { addresses: Vec<String> },
-    Claim {},
+    Claim { order_id: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

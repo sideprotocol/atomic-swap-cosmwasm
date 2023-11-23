@@ -39,9 +39,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::StartVesting { vesting } => execute_start_vesting(deps, env, info, vesting),
+        ExecuteMsg::StartVesting { vesting, order_id} => execute_start_vesting(deps, env, info, vesting, order_id),
         ExecuteMsg::SetAllowed { addresses } => execute_set_contract(deps, env, info, addresses),
-        ExecuteMsg::Claim {} => execute_claim(deps, env, info),
+        ExecuteMsg::Claim { order_id } => execute_claim(deps, env, info, order_id),
     }
 }
 
@@ -50,6 +50,7 @@ pub fn execute_start_vesting(
     _env: Env,
     info: MessageInfo,
     vesting: VestingDetails,
+    order_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let mut ok = false;
@@ -89,12 +90,7 @@ pub fn execute_start_vesting(
         )));
     }
 
-    if let Some(mut val) = VESTED_TOKENS_ALL.may_load(deps.storage, info.sender.to_string())? {
-        val.push(vesting);
-        VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &val)?;
-    } else {
-        VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &vec![vesting])?;
-    }
+    VESTED_TOKENS_ALL.save(deps.storage, (info.sender.to_string(), order_id), &vesting)?;
 
     let res = Response::new().add_attribute("action", "start_vesting");
     Ok(res)
@@ -124,6 +120,7 @@ pub fn execute_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    order_id: String,
 ) -> Result<Response, ContractError> {
     let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, info.sender.clone().to_string())?;
     let mut new_vesting = vec![];
