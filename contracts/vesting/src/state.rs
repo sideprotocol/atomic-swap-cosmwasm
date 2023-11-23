@@ -31,6 +31,8 @@ pub struct Config {
     // allowed addresses which can enable vesting for receiver
     pub allowed_addresses: Vec<String>,
 }
-pub const VESTED_TOKENS_ALL: Map<String, Vec<VestingDetails>> = Map::new("vested_tokens_all");
+
+// Map from (User, OrderId) -> VestingDetails
+pub const VESTED_TOKENS_ALL: Map<(String, String), VestingDetails> = Map::new("vested_tokens_all");
 
 pub const CONFIG: Item<Config> = Item::new("config");

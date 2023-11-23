@@ -39,9 +39,11 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::StartVesting { vesting } => execute_start_vesting(deps, env, info, vesting),
+        ExecuteMsg::StartVesting { vesting, order_id } => {
+            execute_start_vesting(deps, env, info, vesting, order_id)
+        }
         ExecuteMsg::SetAllowed { addresses } => execute_set_contract(deps, env, info, addresses),
-        ExecuteMsg::Claim {} => execute_claim(deps, env, info),
+        ExecuteMsg::Claim { order_id } => execute_claim(deps, env, info, order_id),
     }
 }
 
@@ -50,6 +52,7 @@ pub fn execute_start_vesting(
     _env: Env,
     info: MessageInfo,
     vesting: VestingDetails,
+    order_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let mut ok = false;
@@ -89,12 +92,7 @@ pub fn execute_start_vesting(
         )));
     }
 
-    if let Some(mut val) = VESTED_TOKENS_ALL.may_load(deps.storage, info.sender.to_string())? {
-        val.push(vesting);
-        VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &val)?;
-    } else {
-        VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &vec![vesting])?;
-    }
+    VESTED_TOKENS_ALL.save(deps.storage, (info.sender.to_string(), order_id), &vesting)?;
 
     let res = Response::new().add_attribute("action", "start_vesting");
     Ok(res)
@@ -124,40 +122,40 @@ pub fn execute_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    order_id: String,
 ) -> Result<Response, ContractError> {
-    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, info.sender.clone().to_string())?;
-    let mut new_vesting = vec![];
+    let mut vesting = VESTED_TOKENS_ALL.load(
+        deps.storage,
+        (info.sender.clone().to_string(), order_id.clone()),
+    )?;
     let mut send_msg = vec![];
 
-    for mut vesting in vesting_details {
-        let now = env.block.time.seconds();
-        if vesting.start_time <= now {
-            let mut now_with_cliff = vesting.start_time;
-            let mut release_amount = Uint128::from(0u64);
-            for schedule in vesting.schedules.clone() {
-                now_with_cliff += schedule.interval;
-                if now_with_cliff <= now {
-                    release_amount += schedule.amount;
-                } else {
-                    break;
-                }
+    let now = env.block.time.seconds();
+    if vesting.start_time <= now {
+        let mut now_with_cliff = vesting.start_time;
+        let mut release_amount = Uint128::from(0u64);
+        for schedule in vesting.schedules.clone() {
+            now_with_cliff += schedule.interval;
+            if now_with_cliff <= now {
+                release_amount += schedule.amount;
+            } else {
+                break;
             }
-            let final_amount = release_amount.u128() - vesting.amount_claimed.u128();
-
-            send_msg.push(BankMsg::Send {
-                to_address: info.sender.to_string(),
-                amount: vec![Coin {
-                    denom: vesting.token.denom.clone(),
-                    amount: Uint128::from(final_amount),
-                }],
-            });
-
-            vesting.amount_claimed += Uint128::from(final_amount);
         }
-        new_vesting.push(vesting);
+        let final_amount = release_amount.u128() - vesting.amount_claimed.u128();
+
+        send_msg.push(BankMsg::Send {
+            to_address: info.sender.to_string(),
+            amount: vec![Coin {
+                denom: vesting.token.denom.clone(),
+                amount: Uint128::from(final_amount),
+            }],
+        });
+
+        vesting.amount_claimed += Uint128::from(final_amount);
     }
 
-    VESTED_TOKENS_ALL.save(deps.storage, info.sender.to_string(), &new_vesting)?;
+    VESTED_TOKENS_ALL.save(deps.storage, (info.sender.to_string(), order_id), &vesting)?;
 
     let res = Response::new()
         .add_attribute("action", "claim_tokens")
@@ -188,8 +186,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         //QueryMsg::QueryClaims { address } => to_json_binary(&query_claims(deps, address)?),
         QueryMsg::QueryConfig {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::QueryVestingDetails { address } => {
-            to_json_binary(&query_vesting_details(deps, address)?)
+        QueryMsg::QueryVestingDetails { address, order_id } => {
+            to_json_binary(&query_vesting_details(deps, address, order_id)?)
         }
     }
 }
@@ -200,8 +198,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 //     Ok(config.contract_address)
 // }
 
-fn query_vesting_details(deps: Deps, address: String) -> StdResult<Vec<VestingDetails>> {
-    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, address)?;
+fn query_vesting_details(
+    deps: Deps,
+    address: String,
+    order_id: String,
+) -> StdResult<VestingDetails> {
+    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, (address, order_id))?;
     Ok(vesting_details)
 }
 
