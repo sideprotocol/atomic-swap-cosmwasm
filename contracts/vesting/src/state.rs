@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, Uint128};
+use cosmwasm_std::{Coin, Uint128, Addr};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +30,8 @@ pub struct Config {
     pub admin: String,
     // allowed addresses which can enable vesting for receiver
     pub allowed_addresses: Vec<String>,
+    // NFT address
+    pub cw721_address: Option<Addr>,
 }
 
 // Map from (User, OrderId) -> VestingDetails

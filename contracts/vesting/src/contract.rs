@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, ReplyOn,
-    Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, Reply, Addr,
 };
 use cw721_base::{
     helpers::Cw721Contract, msg::ExecuteMsg as Cw721ExecuteMsg,
@@ -10,6 +10,7 @@ use cw721_base::{
 };
 
 use cw2::set_contract_version;
+use cw_utils::parse_reply_instantiate_data;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
@@ -32,6 +33,7 @@ pub fn instantiate(
     let config = Config {
         admin: info.sender.into_string(),
         allowed_addresses: msg.allowed_addresses,
+        cw721_address: None,
     };
     CONFIG.save(deps.storage, &config)?;
 
@@ -54,6 +56,26 @@ pub fn instantiate(
     }];
 
     Ok(Response::new().add_submessages(sub_msg))
+}
+
+// Reply callback triggered from cw721 contract instantiation
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    if config.cw721_address.is_some() {
+        return Err(ContractError::Cw721AlreadyLinked {});
+    }
+
+    if msg.id != INSTANTIATE_TOKEN_REPLY_ID {
+        return Err(ContractError::InvalidTokenReplyId {});
+    }
+
+    let reply = parse_reply_instantiate_data(msg).unwrap();
+    config.cw721_address = Addr::unchecked(reply.contract_address).into();
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

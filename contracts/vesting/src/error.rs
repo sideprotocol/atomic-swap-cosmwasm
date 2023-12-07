@@ -71,4 +71,13 @@ pub enum ContractError {
 
     #[error("Bid doesn't exist")]
     BidDoesntExist,
+
+    #[error("InvalidTokenReplyId")]
+    InvalidTokenReplyId {},
+
+    #[error("Cw721NotLinked")]
+    Cw721NotLinked {},
+
+    #[error("Cw721AlreadyLinked")]
+    Cw721AlreadyLinked {},
 }
