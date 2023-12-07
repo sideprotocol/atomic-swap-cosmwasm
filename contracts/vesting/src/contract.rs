@@ -103,6 +103,11 @@ pub fn execute_start_vesting(
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let mut ok = false;
+
+    if config.cw721_address.is_none() {
+        return Err(ContractError::Cw721NotLinked {});
+    }
+
     for address in config.allowed_addresses {
         if address == info.sender {
             ok = true;
@@ -113,6 +118,8 @@ pub fn execute_start_vesting(
             "Must be called by allowed address"
         ))));
     }
+
+    // TODO: Mint NFT to receiver.
 
     let mut total_amount = Uint128::from(0u64);
     for schedule in vesting.schedules.clone() {
@@ -175,6 +182,8 @@ pub fn execute_claim(
         deps.storage,
         (info.sender.clone().to_string(), order_id.clone()),
     )?;
+
+    // TODO: Add check for owner of nft_id, nft_id owner can claim
     let mut send_msg = vec![];
 
     let now = env.block.time.seconds();
