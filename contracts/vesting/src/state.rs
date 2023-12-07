@@ -1,4 +1,4 @@
-use cosmwasm_std::{Coin, Uint128, Addr};
+use cosmwasm_std::{Addr, Coin, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +34,7 @@ pub struct Config {
     pub cw721_address: Option<Addr>,
 }
 
-// Map from (User, OrderId) -> VestingDetails
-pub const VESTED_TOKENS_ALL: Map<(String, String), VestingDetails> = Map::new("vested_tokens_all");
+// Map from NFT_ID/VESTING_ID -> VestingDetails
+pub const VESTED_TOKENS_ALL: Map<String, VestingDetails> = Map::new("vested_tokens_all");
 
 pub const CONFIG: Item<Config> = Item::new("config");
