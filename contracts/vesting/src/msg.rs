@@ -6,6 +6,9 @@ use crate::state::VestingDetails;
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
     pub allowed_addresses: Vec<String>,
+    pub token_code_id: u64,
+    pub name: String,
+    pub symbol: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

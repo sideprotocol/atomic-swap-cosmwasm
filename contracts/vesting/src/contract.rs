@@ -1,8 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128,
+    to_binary, to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, ReplyOn,
+    Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+};
+use cw721_base::{
+    helpers::Cw721Contract, msg::ExecuteMsg as Cw721ExecuteMsg,
+    msg::InstantiateMsg as Cw721InstantiateMsg,
 };
 
 use cw2::set_contract_version;
@@ -15,10 +19,12 @@ use crate::state::{Config, VestingDetails, CONFIG, VESTED_TOKENS_ALL};
 const CONTRACT_NAME: &str = "vesting";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const INSTANTIATE_TOKEN_REPLY_ID: u64 = 1;
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
@@ -28,7 +34,26 @@ pub fn instantiate(
         allowed_addresses: msg.allowed_addresses,
     };
     CONFIG.save(deps.storage, &config)?;
-    Ok(Response::default())
+
+    let sub_msg: Vec<SubMsg> = vec![SubMsg {
+        msg: WasmMsg::Instantiate {
+            code_id: msg.token_code_id,
+            msg: to_binary(&Cw721InstantiateMsg {
+                name: msg.name.clone(),
+                symbol: msg.symbol,
+                minter: env.contract.address.to_string(),
+            })?,
+            funds: vec![],
+            admin: None,
+            label: String::from("Instantiate NFT contract"),
+        }
+        .into(),
+        id: INSTANTIATE_TOKEN_REPLY_ID,
+        gas_limit: None,
+        reply_on: ReplyOn::Success,
+    }];
+
+    Ok(Response::new().add_submessages(sub_msg))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
