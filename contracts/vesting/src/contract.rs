@@ -1,11 +1,16 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError,
-    StdResult, Uint128,
+    to_binary, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply,
+    ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+};
+use cw721_base::{
+    helpers::Cw721Contract, msg::ExecuteMsg as Cw721ExecuteMsg,
+    msg::InstantiateMsg as Cw721InstantiateMsg,
 };
 
 use cw2::set_contract_version;
+use cw_utils::parse_reply_instantiate_data;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
@@ -15,10 +20,12 @@ use crate::state::{Config, VestingDetails, CONFIG, VESTED_TOKENS_ALL};
 const CONTRACT_NAME: &str = "vesting";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const INSTANTIATE_TOKEN_REPLY_ID: u64 = 1;
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
@@ -26,9 +33,49 @@ pub fn instantiate(
     let config = Config {
         admin: info.sender.into_string(),
         allowed_addresses: msg.allowed_addresses,
+        cw721_address: None,
     };
     CONFIG.save(deps.storage, &config)?;
-    Ok(Response::default())
+
+    let sub_msg: Vec<SubMsg> = vec![SubMsg {
+        msg: WasmMsg::Instantiate {
+            code_id: msg.token_code_id,
+            msg: to_binary(&Cw721InstantiateMsg {
+                name: msg.name.clone(),
+                symbol: msg.symbol,
+                minter: env.contract.address.to_string(),
+            })?,
+            funds: vec![],
+            admin: None,
+            label: String::from("Instantiate NFT contract"),
+        }
+        .into(),
+        id: INSTANTIATE_TOKEN_REPLY_ID,
+        gas_limit: None,
+        reply_on: ReplyOn::Success,
+    }];
+
+    Ok(Response::new().add_submessages(sub_msg))
+}
+
+// Reply callback triggered from cw721 contract instantiation
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    if config.cw721_address.is_some() {
+        return Err(ContractError::Cw721AlreadyLinked {});
+    }
+
+    if msg.id != INSTANTIATE_TOKEN_REPLY_ID {
+        return Err(ContractError::InvalidTokenReplyId {});
+    }
+
+    let reply = parse_reply_instantiate_data(msg).unwrap();
+    config.cw721_address = Addr::unchecked(reply.contract_address).into();
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -39,11 +86,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::StartVesting { vesting, order_id } => {
-            execute_start_vesting(deps, env, info, vesting, order_id)
-        }
+        ExecuteMsg::StartVesting { vesting } => execute_start_vesting(deps, env, info, vesting),
         ExecuteMsg::SetAllowed { addresses } => execute_set_contract(deps, env, info, addresses),
-        ExecuteMsg::Claim { order_id } => execute_claim(deps, env, info, order_id),
+        ExecuteMsg::Claim { nft_id } => execute_claim(deps, env, info, nft_id),
     }
 }
 
@@ -52,10 +97,14 @@ pub fn execute_start_vesting(
     _env: Env,
     info: MessageInfo,
     vesting: VestingDetails,
-    order_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let mut ok = false;
+
+    if config.cw721_address.is_none() {
+        return Err(ContractError::Cw721NotLinked {});
+    }
+
     for address in config.allowed_addresses {
         if address == info.sender {
             ok = true;
@@ -66,6 +115,9 @@ pub fn execute_start_vesting(
             "Must be called by allowed address"
         ))));
     }
+
+    // TODO: Mint NFT to receiver.
+    let nft_id = "nft".to_string();
 
     let mut total_amount = Uint128::from(0u64);
     for schedule in vesting.schedules.clone() {
@@ -92,7 +144,7 @@ pub fn execute_start_vesting(
         )));
     }
 
-    VESTED_TOKENS_ALL.save(deps.storage, (info.sender.to_string(), order_id), &vesting)?;
+    VESTED_TOKENS_ALL.save(deps.storage, nft_id, &vesting)?;
 
     let res = Response::new().add_attribute("action", "start_vesting");
     Ok(res)
@@ -122,12 +174,11 @@ pub fn execute_claim(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    order_id: String,
+    nft_id: String,
 ) -> Result<Response, ContractError> {
-    let mut vesting = VESTED_TOKENS_ALL.load(
-        deps.storage,
-        (info.sender.clone().to_string(), order_id.clone()),
-    )?;
+    let mut vesting = VESTED_TOKENS_ALL.load(deps.storage, nft_id.clone())?;
+
+    // TODO: Add check for owner of nft_id, nft_id owner can claim
     let mut send_msg = vec![];
 
     let now = env.block.time.seconds();
@@ -155,7 +206,7 @@ pub fn execute_claim(
         vesting.amount_claimed += Uint128::from(final_amount);
     }
 
-    VESTED_TOKENS_ALL.save(deps.storage, (info.sender.to_string(), order_id), &vesting)?;
+    VESTED_TOKENS_ALL.save(deps.storage, nft_id, &vesting)?;
 
     let res = Response::new()
         .add_attribute("action", "claim_tokens")
@@ -186,8 +237,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         //QueryMsg::QueryClaims { address } => to_json_binary(&query_claims(deps, address)?),
         QueryMsg::QueryConfig {} => to_json_binary(&query_config(deps)?),
-        QueryMsg::QueryVestingDetails { address, order_id } => {
-            to_json_binary(&query_vesting_details(deps, address, order_id)?)
+        QueryMsg::QueryVestingDetails { nft_id } => {
+            to_json_binary(&query_vesting_details(deps, nft_id)?)
         }
     }
 }
@@ -198,12 +249,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 //     Ok(config.contract_address)
 // }
 
-fn query_vesting_details(
-    deps: Deps,
-    address: String,
-    order_id: String,
-) -> StdResult<VestingDetails> {
-    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, (address, order_id))?;
+fn query_vesting_details(deps: Deps, nft_id: String) -> StdResult<VestingDetails> {
+    let vesting_details = VESTED_TOKENS_ALL.load(deps.storage, nft_id)?;
     Ok(vesting_details)
 }
 

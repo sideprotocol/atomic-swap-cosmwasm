@@ -97,7 +97,9 @@ pub fn execute_make_swap(
             total_amount += schedule.amount;
         }
         if total_amount != msg.sell_token.amount {
-            return Err(ContractError::Std(StdError::generic_err("Total amount of tokens is not equal to total vesting amount".to_string())));
+            return Err(ContractError::Std(StdError::generic_err(
+                "Total amount of tokens is not equal to total vesting amount".to_string(),
+            )));
         }
     }
 
