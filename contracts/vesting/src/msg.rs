@@ -1,5 +1,4 @@
 use cw721_base::{state::Approval, Extension};
-use cw_utils::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
