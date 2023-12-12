@@ -80,4 +80,7 @@ pub enum ContractError {
 
     #[error("Cw721AlreadyLinked")]
     Cw721AlreadyLinked {},
+
+    #[error("AlreadyClaimed")]
+    AlreadyClaimed {},
 }

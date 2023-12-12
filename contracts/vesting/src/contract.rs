@@ -192,13 +192,12 @@ pub fn execute_claim(
     info: MessageInfo,
     nft_id: String,
 ) -> Result<Response, ContractError> {
-    let mut vesting = VESTED_TOKENS_ALL.load(deps.storage, nft_id.clone())?;
+    let mut vesting: VestingDetails = VESTED_TOKENS_ALL.load(deps.storage, nft_id.clone())?;
     let config = CONFIG.load(deps.storage)?;
     if config.cw721_address.is_none() {
         return Err(ContractError::Cw721NotLinked {});
     }
 
-    // TODO: Add check for owner of nft_id, nft_id owner can claim
     let owner_of_query = WasmQuery::Smart {
         contract_addr: config.cw721_address.unwrap().into_string(),
         msg: to_binary(&Cw721QueryMsg::<OwnerOfResponse>::OwnerOf {
@@ -238,6 +237,10 @@ pub fn execute_claim(
             }
         }
         let final_amount = release_amount.u128() - vesting.amount_claimed.u128();
+
+        if final_amount == 0 {
+            return Err(ContractError::AlreadyClaimed {});
+        }
 
         send_msg.push(BankMsg::Send {
             to_address: info.sender.to_string(),
