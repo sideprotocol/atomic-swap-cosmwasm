@@ -33,7 +33,7 @@ pub struct Config {
     pub allowed_addresses: Vec<String>,
     // NFT address
     pub cw721_address: Option<Addr>,
-    pub extension: Extension
+    pub extension: Extension,
 }
 
 // Map from NFT_ID/VESTING_ID -> VestingDetails

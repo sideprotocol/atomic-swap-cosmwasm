@@ -5,9 +5,8 @@ use cosmwasm_std::{
     Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
 };
 use cw721_base::{
-    msg::ExecuteMsg as Cw721ExecuteMsg, 
+    msg::ExecuteMsg as Cw721ExecuteMsg, msg::InstantiateMsg as Cw721InstantiateMsg,
     msg::QueryMsg as Cw721QueryMsg,
-    msg::InstantiateMsg as Cw721InstantiateMsg
 };
 
 use cw2::set_contract_version;
@@ -35,7 +34,7 @@ pub fn instantiate(
         admin: info.sender.into_string(),
         allowed_addresses: msg.allowed_addresses,
         cw721_address: None,
-        extension: msg.extension
+        extension: msg.extension,
     };
     CONFIG.save(deps.storage, &config)?;
 
@@ -125,7 +124,7 @@ pub fn execute_start_vesting(
         token_id: order_id.clone(),
         owner: vesting.receiver.clone(),
         token_uri: None,
-        extension: config.extension
+        extension: config.extension,
     };
     let exec = WasmMsg::Execute {
         contract_addr: config.cw721_address.unwrap().into_string(),
@@ -161,8 +160,8 @@ pub fn execute_start_vesting(
     VESTED_TOKENS_ALL.save(deps.storage, order_id, &vesting)?;
 
     let res = Response::new()
-    .add_message(exec)
-    .add_attribute("action", "start_vesting");
+        .add_message(exec)
+        .add_attribute("action", "start_vesting");
     Ok(res)
 }
 
