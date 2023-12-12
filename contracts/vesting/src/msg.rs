@@ -1,4 +1,5 @@
-use cw721_base::Extension;
+use cw721_base::{state::Approval, Extension};
+use cw_utils::Expiration;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -39,4 +40,12 @@ pub enum QueryMsg {
     QueryVestingDetails { nft_id: String },
     /// Returns config
     QueryConfig {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct OwnerOfResponse {
+    /// Owner of the token
+    pub owner: String,
+    /// If set this address is approved to transfer/send the token as well
+    pub approvals: Vec<Approval>,
 }

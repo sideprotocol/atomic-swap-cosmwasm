@@ -2,8 +2,9 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo,
-    Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
 };
+use cw721_base::state::Approval;
 use cw721_base::{
     msg::ExecuteMsg as Cw721ExecuteMsg, msg::InstantiateMsg as Cw721InstantiateMsg,
     msg::QueryMsg as Cw721QueryMsg,
@@ -13,7 +14,7 @@ use cw2::set_contract_version;
 use cw_utils::parse_reply_instantiate_data;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, OwnerOfResponse, QueryMsg};
 use crate::state::{Config, VestingDetails, CONFIG, VESTED_TOKENS_ALL};
 
 // Version info, for migration info
@@ -192,8 +193,36 @@ pub fn execute_claim(
     nft_id: String,
 ) -> Result<Response, ContractError> {
     let mut vesting = VESTED_TOKENS_ALL.load(deps.storage, nft_id.clone())?;
+    let config = CONFIG.load(deps.storage)?;
+    if config.cw721_address.is_none() {
+        return Err(ContractError::Cw721NotLinked {});
+    }
 
     // TODO: Add check for owner of nft_id, nft_id owner can claim
+    let owner_of_query = WasmQuery::Smart {
+        contract_addr: config.cw721_address.unwrap().into_string(),
+        msg: to_binary(&Cw721QueryMsg::<OwnerOfResponse>::OwnerOf {
+            token_id: nft_id.clone(),
+            include_expired: Some(false),
+        })?,
+    };
+
+    let owner_info = deps
+        .querier
+        .query(&owner_of_query.into())
+        .unwrap_or_else(|_| OwnerOfResponse {
+            owner: "".to_string(),
+            approvals: [Approval {
+                spender: Addr::unchecked("input".to_string()),
+                expires: cw_utils::Expiration::Never {},
+            }]
+            .to_vec(),
+        });
+
+    if owner_info.owner != info.sender {
+        return Err(ContractError::InvalidSender {});
+    }
+
     let mut send_msg = vec![];
 
     let now = env.block.time.seconds();
