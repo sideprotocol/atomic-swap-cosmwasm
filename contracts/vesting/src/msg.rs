@@ -1,3 +1,4 @@
+use cw721_base::Extension;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,13 +10,21 @@ pub struct InstantiateMsg {
     pub token_code_id: u64,
     pub name: String,
     pub symbol: String,
+    pub extension: Extension,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
-    StartVesting { vesting: VestingDetails },
-    SetAllowed { addresses: Vec<String> },
-    Claim { nft_id: String },
+    StartVesting {
+        vesting: VestingDetails,
+        order_id: String,
+    },
+    SetAllowed {
+        addresses: Vec<String>,
+    },
+    Claim {
+        nft_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

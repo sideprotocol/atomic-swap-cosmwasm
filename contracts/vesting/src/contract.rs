@@ -1,12 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Reply,
-    ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    to_binary, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo,
+    Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
 };
 use cw721_base::{
-    helpers::Cw721Contract, msg::ExecuteMsg as Cw721ExecuteMsg,
-    msg::InstantiateMsg as Cw721InstantiateMsg,
+    msg::ExecuteMsg as Cw721ExecuteMsg, 
+    msg::QueryMsg as Cw721QueryMsg,
+    msg::InstantiateMsg as Cw721InstantiateMsg
 };
 
 use cw2::set_contract_version;
@@ -34,6 +35,7 @@ pub fn instantiate(
         admin: info.sender.into_string(),
         allowed_addresses: msg.allowed_addresses,
         cw721_address: None,
+        extension: msg.extension
     };
     CONFIG.save(deps.storage, &config)?;
 
@@ -86,7 +88,9 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::StartVesting { vesting } => execute_start_vesting(deps, env, info, vesting),
+        ExecuteMsg::StartVesting { vesting, order_id } => {
+            execute_start_vesting(deps, env, info, vesting, order_id)
+        }
         ExecuteMsg::SetAllowed { addresses } => execute_set_contract(deps, env, info, addresses),
         ExecuteMsg::Claim { nft_id } => execute_claim(deps, env, info, nft_id),
     }
@@ -97,6 +101,7 @@ pub fn execute_start_vesting(
     _env: Env,
     info: MessageInfo,
     vesting: VestingDetails,
+    order_id: String,
 ) -> Result<Response, ContractError> {
     let config = CONFIG.load(deps.storage)?;
     let mut ok = false;
@@ -116,14 +121,23 @@ pub fn execute_start_vesting(
         ))));
     }
 
-    // TODO: Mint NFT to receiver.
-    let nft_id = "nft".to_string();
+    let msg = Cw721ExecuteMsg::<_, Empty>::Mint {
+        token_id: order_id.clone(),
+        owner: vesting.receiver.clone(),
+        token_uri: None,
+        extension: config.extension
+    };
+    let exec = WasmMsg::Execute {
+        contract_addr: config.cw721_address.unwrap().into_string(),
+        msg: to_binary(&msg)?,
+        funds: vec![],
+    };
 
     let mut total_amount = Uint128::from(0u64);
     for schedule in vesting.schedules.clone() {
         total_amount += schedule.amount;
     }
-    if total_amount != vesting.token.amount {
+    if total_amount != vesting.token.amount.clone() {
         return Err(ContractError::Std(StdError::generic_err(format!(
             "Total amount of tokens is not equal to total vesting amount"
         ))));
@@ -133,7 +147,7 @@ pub fn execute_start_vesting(
     let mut ok = false;
     // First token in this chain only first token needs to be verified
     for asset in info.funds {
-        if asset == vesting.token {
+        if asset == vesting.token.clone() {
             ok = true;
         }
     }
@@ -144,9 +158,11 @@ pub fn execute_start_vesting(
         )));
     }
 
-    VESTED_TOKENS_ALL.save(deps.storage, nft_id, &vesting)?;
+    VESTED_TOKENS_ALL.save(deps.storage, order_id, &vesting)?;
 
-    let res = Response::new().add_attribute("action", "start_vesting");
+    let res = Response::new()
+    .add_message(exec)
+    .add_attribute("action", "start_vesting");
     Ok(res)
 }
 
