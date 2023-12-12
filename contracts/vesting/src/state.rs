@@ -1,4 +1,5 @@
 use cosmwasm_std::{Addr, Coin, Uint128};
+use cw721_base::Extension;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +33,7 @@ pub struct Config {
     pub allowed_addresses: Vec<String>,
     // NFT address
     pub cw721_address: Option<Addr>,
+    pub extension: Extension,
 }
 
 // Map from NFT_ID/VESTING_ID -> VestingDetails

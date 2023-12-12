@@ -1,3 +1,4 @@
+use cw721_base::{state::Approval, Extension};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -9,13 +10,21 @@ pub struct InstantiateMsg {
     pub token_code_id: u64,
     pub name: String,
     pub symbol: String,
+    pub extension: Extension,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum ExecuteMsg {
-    StartVesting { vesting: VestingDetails },
-    SetAllowed { addresses: Vec<String> },
-    Claim { nft_id: String },
+    StartVesting {
+        vesting: VestingDetails,
+        order_id: String,
+    },
+    SetAllowed {
+        addresses: Vec<String>,
+    },
+    Claim {
+        nft_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -30,4 +39,12 @@ pub enum QueryMsg {
     QueryVestingDetails { nft_id: String },
     /// Returns config
     QueryConfig {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct OwnerOfResponse {
+    /// Owner of the token
+    pub owner: String,
+    /// If set this address is approved to transfer/send the token as well
+    pub approvals: Vec<Approval>,
 }
