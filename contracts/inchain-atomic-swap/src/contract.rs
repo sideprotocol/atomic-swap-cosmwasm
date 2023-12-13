@@ -208,6 +208,7 @@ pub fn execute_take_swap(
 
         let vesting_msg = StartVesting {
             vesting: vesting_call,
+            order_id: order.id.clone(),
         };
 
         // log message
@@ -434,6 +435,7 @@ pub fn execute_take_bid(
 
         let vesting_msg = StartVesting {
             vesting: vesting_call,
+            order_id: order.id.clone(),
         };
 
         // log message

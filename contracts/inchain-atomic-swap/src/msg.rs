@@ -99,7 +99,10 @@ pub struct ReleaseInterval {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub enum VestingExecuteMsg {
-    StartVesting { vesting: VestingDetails },
+    StartVesting {
+        vesting: VestingDetails,
+        order_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]

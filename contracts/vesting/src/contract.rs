@@ -1,13 +1,13 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo,
-    Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
+    ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
 };
 use cw721_base::state::Approval;
 use cw721_base::{
     msg::ExecuteMsg as Cw721ExecuteMsg, msg::InstantiateMsg as Cw721InstantiateMsg,
-    msg::QueryMsg as Cw721QueryMsg, MintMsg
+    msg::QueryMsg as Cw721QueryMsg, MintMsg,
 };
 
 use cw2::set_contract_version;
@@ -121,7 +121,7 @@ pub fn execute_start_vesting(
         ))));
     }
 
-    let msg = Cw721ExecuteMsg::<_, Empty>::Mint(MintMsg{
+    let msg = Cw721ExecuteMsg::<_, Empty>::Mint(MintMsg {
         token_id: order_id.clone(),
         owner: vesting.receiver.clone(),
         token_uri: None,
