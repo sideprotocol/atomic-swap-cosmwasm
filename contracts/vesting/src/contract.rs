@@ -1,17 +1,17 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo,
-    Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
+    ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
 };
 use cw721_base::state::Approval;
 use cw721_base::{
     msg::ExecuteMsg as Cw721ExecuteMsg, msg::InstantiateMsg as Cw721InstantiateMsg,
-    msg::QueryMsg as Cw721QueryMsg,
+    msg::QueryMsg as Cw721QueryMsg, MintMsg,
 };
 
 use cw2::set_contract_version;
-use cw_utils::parse_reply_instantiate_data;
+use cw_utils::{parse_reply_instantiate_data, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, OwnerOfResponse, QueryMsg};
@@ -35,14 +35,14 @@ pub fn instantiate(
         admin: info.sender.into_string(),
         allowed_addresses: msg.allowed_addresses,
         cw721_address: None,
-        extension: msg.extension,
+        extension: None,
     };
     CONFIG.save(deps.storage, &config)?;
 
     let sub_msg: Vec<SubMsg> = vec![SubMsg {
         msg: WasmMsg::Instantiate {
             code_id: msg.token_code_id,
-            msg: to_binary(&Cw721InstantiateMsg {
+            msg: to_json_binary(&Cw721InstantiateMsg {
                 name: msg.name.clone(),
                 symbol: msg.symbol,
                 minter: env.contract.address.to_string(),
@@ -121,15 +121,15 @@ pub fn execute_start_vesting(
         ))));
     }
 
-    let msg = Cw721ExecuteMsg::<_, Empty>::Mint {
+    let msg = Cw721ExecuteMsg::<_, Empty>::Mint(MintMsg {
         token_id: order_id.clone(),
         owner: vesting.receiver.clone(),
         token_uri: None,
         extension: config.extension,
-    };
+    });
     let exec = WasmMsg::Execute {
         contract_addr: config.cw721_address.unwrap().into_string(),
-        msg: to_binary(&msg)?,
+        msg: to_json_binary(&msg)?,
         funds: vec![],
     };
 
@@ -192,16 +192,15 @@ pub fn execute_claim(
     info: MessageInfo,
     nft_id: String,
 ) -> Result<Response, ContractError> {
-    let mut vesting = VESTED_TOKENS_ALL.load(deps.storage, nft_id.clone())?;
+    let mut vesting: VestingDetails = VESTED_TOKENS_ALL.load(deps.storage, nft_id.clone())?;
     let config = CONFIG.load(deps.storage)?;
     if config.cw721_address.is_none() {
         return Err(ContractError::Cw721NotLinked {});
     }
 
-    // TODO: Add check for owner of nft_id, nft_id owner can claim
     let owner_of_query = WasmQuery::Smart {
         contract_addr: config.cw721_address.unwrap().into_string(),
-        msg: to_binary(&Cw721QueryMsg::<OwnerOfResponse>::OwnerOf {
+        msg: to_json_binary(&Cw721QueryMsg::<OwnerOfResponse>::OwnerOf {
             token_id: nft_id.clone(),
             include_expired: Some(false),
         })?,
@@ -214,7 +213,7 @@ pub fn execute_claim(
             owner: "".to_string(),
             approvals: [Approval {
                 spender: Addr::unchecked("input".to_string()),
-                expires: cw_utils::Expiration::Never {},
+                expires: Expiration::Never {},
             }]
             .to_vec(),
         });
@@ -238,6 +237,10 @@ pub fn execute_claim(
             }
         }
         let final_amount = release_amount.u128() - vesting.amount_claimed.u128();
+
+        if final_amount == 0 {
+            return Err(ContractError::AlreadyClaimed {});
+        }
 
         send_msg.push(BankMsg::Send {
             to_address: info.sender.to_string(),

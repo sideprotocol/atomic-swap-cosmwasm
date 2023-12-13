@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    from_binary, Addr, BankMsg, Binary, Coin, Deps, IbcAcknowledgement, IbcChannel, IbcOrder,
+    from_json, Addr, BankMsg, Binary, Coin, Deps, IbcAcknowledgement, IbcChannel, IbcOrder,
     StdError, StdResult, SubMsg, Uint128,
 };
 
@@ -51,7 +51,7 @@ pub fn extract_source_channel_for_taker_msg(path: &str) -> StdResult<String> {
 pub fn try_get_ack_error(ack: &IbcAcknowledgement) -> Option<String> {
     let ack: AtomicSwapPacketAcknowledgement =
 	// What we can not parse is an ACK fail.
-        from_binary(&ack.data).unwrap_or_else(|_| AtomicSwapPacketAcknowledgement::Error(ack.data.to_base64()));
+        from_json(&ack.data).unwrap_or_else(|_| AtomicSwapPacketAcknowledgement::Error(ack.data.to_base64()));
     match ack {
         AtomicSwapPacketAcknowledgement::Error(e) => Some(e),
         _ => None,
@@ -84,7 +84,7 @@ pub(crate) fn enforce_order_and_version(
 }
 
 pub(crate) fn decode_take_swap_msg(data: &Binary) -> TakeSwapMsg {
-    let msg_res: Result<TakeSwapMsg, StdError> = from_binary(data);
+    let msg_res: Result<TakeSwapMsg, StdError> = from_json(data);
     let msg: TakeSwapMsg;
 
     match msg_res {
@@ -92,7 +92,7 @@ pub(crate) fn decode_take_swap_msg(data: &Binary) -> TakeSwapMsg {
             msg = value;
         }
         Err(_err) => {
-            let msg_output: TakeSwapMsgOutput = from_binary(data).unwrap();
+            let msg_output: TakeSwapMsgOutput = from_json(data).unwrap();
             msg = TakeSwapMsg {
                 order_id: msg_output.order_id.clone(),
                 sell_token: msg_output.sell_token.clone(),
@@ -110,7 +110,7 @@ pub(crate) fn decode_take_swap_msg(data: &Binary) -> TakeSwapMsg {
 }
 
 pub(crate) fn decode_make_swap_msg(data: &Binary) -> MakeSwapMsg {
-    let msg_res: Result<MakeSwapMsg, StdError> = from_binary(data);
+    let msg_res: Result<MakeSwapMsg, StdError> = from_json(data);
     let msg: MakeSwapMsg;
 
     match msg_res {
@@ -118,7 +118,7 @@ pub(crate) fn decode_make_swap_msg(data: &Binary) -> MakeSwapMsg {
             msg = value;
         }
         Err(_err) => {
-            let msg_output: MakeSwapMsgOutput = from_binary(data).unwrap();
+            let msg_output: MakeSwapMsgOutput = from_json(data).unwrap();
             msg = MakeSwapMsg {
                 source_port: msg_output.source_port.clone(),
                 source_channel: msg_output.source_channel.clone(),
