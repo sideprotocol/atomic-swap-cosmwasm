@@ -1,4 +1,4 @@
-use cw721_base::{state::Approval, Extension};
+use cw721_base::state::Approval;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +10,6 @@ pub struct InstantiateMsg {
     pub token_code_id: u64,
     pub name: String,
     pub symbol: String,
-    pub extension: Extension,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

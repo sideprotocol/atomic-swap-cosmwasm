@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo,
+    to_json_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Empty, Env, MessageInfo,
     Reply, ReplyOn, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg, WasmQuery,
 };
 use cw721_base::state::Approval;
@@ -35,14 +35,14 @@ pub fn instantiate(
         admin: info.sender.into_string(),
         allowed_addresses: msg.allowed_addresses,
         cw721_address: None,
-        extension: msg.extension,
+        extension: None,
     };
     CONFIG.save(deps.storage, &config)?;
 
     let sub_msg: Vec<SubMsg> = vec![SubMsg {
         msg: WasmMsg::Instantiate {
             code_id: msg.token_code_id,
-            msg: to_binary(&Cw721InstantiateMsg {
+            msg: to_json_binary(&Cw721InstantiateMsg {
                 name: msg.name.clone(),
                 symbol: msg.symbol,
                 minter: env.contract.address.to_string(),
@@ -129,7 +129,7 @@ pub fn execute_start_vesting(
     };
     let exec = WasmMsg::Execute {
         contract_addr: config.cw721_address.unwrap().into_string(),
-        msg: to_binary(&msg)?,
+        msg: to_json_binary(&msg)?,
         funds: vec![],
     };
 
@@ -200,7 +200,7 @@ pub fn execute_claim(
 
     let owner_of_query = WasmQuery::Smart {
         contract_addr: config.cw721_address.unwrap().into_string(),
-        msg: to_binary(&Cw721QueryMsg::<OwnerOfResponse>::OwnerOf {
+        msg: to_json_binary(&Cw721QueryMsg::<OwnerOfResponse>::OwnerOf {
             token_id: nft_id.clone(),
             include_expired: Some(false),
         })?,

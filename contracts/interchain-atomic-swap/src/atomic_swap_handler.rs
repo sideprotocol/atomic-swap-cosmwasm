@@ -14,7 +14,7 @@ use crate::{
     utils::{decode_make_swap_msg, decode_take_swap_msg, maker_fee, send_tokens, taker_fee},
 };
 use cosmwasm_std::{
-    attr, from_binary, to_binary, Addr, Binary, DepsMut, Env, IbcBasicResponse, IbcPacket,
+    attr, from_json, to_json_binary, Addr, Binary, DepsMut, Env, IbcBasicResponse, IbcPacket,
     IbcReceiveResponse, SubMsg, Timestamp,
 };
 
@@ -28,13 +28,13 @@ pub enum AtomicSwapPacketAcknowledgement {
 // create a serialized success message
 pub(crate) fn ack_success() -> Binary {
     let res = AtomicSwapPacketAcknowledgement::Result(b"1".into());
-    to_binary(&res).unwrap()
+    to_json_binary(&res).unwrap()
 }
 
 // create a serialized error message
 pub(crate) fn ack_fail(err: String) -> Binary {
     let res = AtomicSwapPacketAcknowledgement::Error(err);
-    to_binary(&res).unwrap()
+    to_json_binary(&res).unwrap()
 }
 
 pub(crate) fn do_ibc_packet_receive(
@@ -42,7 +42,7 @@ pub(crate) fn do_ibc_packet_receive(
     env: Env,
     packet: &IbcPacket,
 ) -> Result<IbcReceiveResponse, ContractError> {
-    let packet_data: AtomicSwapPacketData = from_binary(&packet.data)?;
+    let packet_data: AtomicSwapPacketData = from_json(&packet.data)?;
 
     match packet_data.r#type {
         SwapMessageType::Unspecified => {
@@ -61,19 +61,19 @@ pub(crate) fn do_ibc_packet_receive(
             on_received_take(deps, env, packet, msg)
         }
         SwapMessageType::CancelSwap => {
-            let msg: CancelSwapMsg = from_binary(&packet_data.data)?;
+            let msg: CancelSwapMsg = from_json(&packet_data.data)?;
             on_received_cancel(deps, env, packet, msg)
         }
         SwapMessageType::MakeBid => {
-            let msg: MakeBidMsg = from_binary(&packet_data.data)?;
+            let msg: MakeBidMsg = from_json(&packet_data.data)?;
             on_received_make_bid(deps, env, packet, msg)
         }
         SwapMessageType::TakeBid => {
-            let msg: TakeBidMsg = from_binary(&packet_data.data)?;
+            let msg: TakeBidMsg = from_json(&packet_data.data)?;
             on_received_take_bid(deps, env, packet, msg)
         }
         SwapMessageType::CancelBid => {
-            let msg: CancelBidMsg = from_binary(&packet_data.data)?;
+            let msg: CancelBidMsg = from_json(&packet_data.data)?;
             on_received_cancel_bid(deps, env, packet, msg)
         }
     }
@@ -85,7 +85,7 @@ pub(crate) fn on_received_make(
     packet: &IbcPacket,
     msg: MakeSwapMsg,
 ) -> Result<IbcReceiveResponse, ContractError> {
-    let packet_data: AtomicSwapPacketData = from_binary(&packet.data)?;
+    let packet_data: AtomicSwapPacketData = from_json(&packet.data)?;
     let order_id = packet_data.order_id.unwrap();
     let path = packet_data.path.unwrap();
     let swap_order = AtomicSwapOrder {
@@ -319,7 +319,7 @@ pub(crate) fn on_packet_success(
     packet: IbcPacket,
     env: Env,
 ) -> Result<IbcBasicResponse, ContractError> {
-    let packet_data: AtomicSwapPacketData = from_binary(&packet.data)?;
+    let packet_data: AtomicSwapPacketData = from_json(&packet.data)?;
 
     // similar event messages like ibctransfer module
     let attributes = vec![attr("action", "acknowledge"), attr("success", "true")];
@@ -371,7 +371,7 @@ pub(crate) fn on_packet_success(
         // This is the step 14 (Cancel & refund) of the atomic swap: https://github.com/cosmos/ibc/tree/main/spec/app/ics-100-atomic-swap
         // It is executed on the Maker chain.
         SwapMessageType::CancelSwap => {
-            let msg: CancelSwapMsg = from_binary(&packet_data.data)?;
+            let msg: CancelSwapMsg = from_json(&packet_data.data)?;
             let order_id = msg.order_id;
             let mut swap_order = get_atomic_order(deps.storage, &order_id)?;
 
@@ -390,7 +390,7 @@ pub(crate) fn on_packet_success(
                 .add_attributes(attributes))
         }
         SwapMessageType::MakeBid => {
-            let msg: MakeBidMsg = from_binary(&packet_data.data)?;
+            let msg: MakeBidMsg = from_json(&packet_data.data)?;
 
             let key = bid_key(&msg.order_id, &msg.taker_address);
             let mut bid = bids().load(deps.storage, key.clone())?;
@@ -401,7 +401,7 @@ pub(crate) fn on_packet_success(
             Ok(IbcBasicResponse::new().add_attributes(attributes))
         }
         SwapMessageType::TakeBid => {
-            let msg: TakeBidMsg = from_binary(&packet_data.data)?;
+            let msg: TakeBidMsg = from_json(&packet_data.data)?;
             let order_id = msg.order_id.clone();
             let mut swap_order = get_atomic_order(deps.storage, &order_id)?;
 
@@ -443,7 +443,7 @@ pub(crate) fn on_packet_success(
                 .add_attributes(attributes))
         }
         SwapMessageType::CancelBid => {
-            let msg: CancelBidMsg = from_binary(&packet_data.data)?;
+            let msg: CancelBidMsg = from_json(&packet_data.data)?;
 
             let key = bid_key(&msg.order_id, &msg.bidder);
             if !bids().has(deps.storage, key.clone()) {
@@ -471,7 +471,7 @@ pub(crate) fn on_packet_failure(
     packet: IbcPacket,
     err: String,
 ) -> Result<IbcBasicResponse, ContractError> {
-    let packet_data: AtomicSwapPacketData = from_binary(&packet.data)?;
+    let packet_data: AtomicSwapPacketData = from_json(&packet.data)?;
     let submsg = refund_packet_token(deps, packet_data)?;
 
     let res = IbcBasicResponse::new()
@@ -522,7 +522,7 @@ pub(crate) fn refund_packet_token(
         // do nothing, only send tokens back when cancel msg is acknowledged.
         SwapMessageType::CancelSwap => Ok(vec![]),
         SwapMessageType::MakeBid => {
-            let msg: MakeBidMsg = from_binary(&packet.data)?;
+            let msg: MakeBidMsg = from_json(&packet.data)?;
             let taker_address: Addr = deps.api.addr_validate(&msg.taker_address)?;
             let submsg = vec![send_tokens(&taker_address, msg.sell_token)?];
             let order_id = msg.order_id;
