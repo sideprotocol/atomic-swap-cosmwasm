@@ -7,11 +7,11 @@ use cosmwasm_std::{
 use cw721_base::state::Approval;
 use cw721_base::{
     msg::ExecuteMsg as Cw721ExecuteMsg, msg::InstantiateMsg as Cw721InstantiateMsg,
-    msg::QueryMsg as Cw721QueryMsg,
+    msg::QueryMsg as Cw721QueryMsg, MintMsg
 };
 
 use cw2::set_contract_version;
-use cw_utils::parse_reply_instantiate_data;
+use cw_utils::{parse_reply_instantiate_data, Expiration};
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, OwnerOfResponse, QueryMsg};
@@ -121,12 +121,12 @@ pub fn execute_start_vesting(
         ))));
     }
 
-    let msg = Cw721ExecuteMsg::<_, Empty>::Mint {
+    let msg = Cw721ExecuteMsg::<_, Empty>::Mint(MintMsg{
         token_id: order_id.clone(),
         owner: vesting.receiver.clone(),
         token_uri: None,
         extension: config.extension,
-    };
+    });
     let exec = WasmMsg::Execute {
         contract_addr: config.cw721_address.unwrap().into_string(),
         msg: to_json_binary(&msg)?,
@@ -213,7 +213,7 @@ pub fn execute_claim(
             owner: "".to_string(),
             approvals: [Approval {
                 spender: Addr::unchecked("input".to_string()),
-                expires: cw_utils::Expiration::Never {},
+                expires: Expiration::Never {},
             }]
             .to_vec(),
         });
