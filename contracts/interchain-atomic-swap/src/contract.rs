@@ -19,8 +19,9 @@ use crate::query_reverse::{
 };
 use crate::state::{
     append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
-    AtomicSwapOrder, Bid, BidKey, BidStatus, FeeInfo, Side, Status, CHANNEL_INFO, COUNT, FEE_INFO,
-    INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
+    AtomicSwapOrder, Bid, BidKey, BidStatus, Config, FeeInfo, Side, Status, CHANNEL_INFO, CONFIG,
+    COUNT, FEE_INFO, INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS,
+    SWAP_SEQUENCE,
 };
 use crate::utils::{extract_source_channel_for_taker_msg, generate_order_id, order_path};
 use cw_storage_plus::Bound;
@@ -41,6 +42,12 @@ pub fn instantiate(
     COUNT.save(deps.storage, &0u64)?;
     INACTIVE_COUNT.save(deps.storage, &0u64)?;
     SWAP_SEQUENCE.save(deps.storage, &0u64)?;
+    CONFIG.save(
+        deps.storage,
+        &Config {
+            vesting: msg.vesting_contract,
+        },
+    )?;
 
     let fee = FeeInfo {
         maker_fee: msg.maker_fee,
@@ -115,6 +122,7 @@ pub fn execute_make_swap(
         complete_timestamp: None,
         create_timestamp: env.block.time.seconds(),
         min_bid_price: msg.min_bid_price,
+        vesting_details: msg.vesting.clone(),
     };
     append_atomic_order(deps.storage, &order_id, &new_order)?;
     let ibc_packet = AtomicSwapPacketData {
@@ -1132,6 +1140,7 @@ mod tests {
             maker_fee: 10,
             taker_fee: 10,
             treasury: "".to_string(),
+            vesting_contract: "".to_string(),
         };
         let info = mock_info("anyone", &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -1147,6 +1156,7 @@ mod tests {
             maker_fee: 10,
             taker_fee: 10,
             treasury: "".to_string(),
+            vesting_contract: "".to_string(),
         };
         let info = mock_info("anyone", &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -1319,6 +1329,7 @@ mod tests {
                 maker_fee: 10,
                 taker_fee: 10,
                 treasury: "".to_string(),
+                vesting_contract: "".to_string(),
             },
         )
         .unwrap();
@@ -1348,6 +1359,7 @@ mod tests {
             timeout_timestamp: env.block.time.plus_seconds(100).nanos(),
             take_bids: false,
             min_bid_price: None,
+            vesting: None,
         };
         let err = execute(deps.as_mut(), env, info, ExecuteMsg::MakeSwap(create)).unwrap_err();
         assert_eq!(err, ContractError::EmptyBalance {});
@@ -1367,6 +1379,7 @@ mod tests {
                 maker_fee: 10,
                 taker_fee: 10,
                 treasury: "".to_string(),
+                vesting_contract: "".to_string(),
             },
         )
         .unwrap();
@@ -1397,6 +1410,7 @@ mod tests {
             timeout_timestamp: 1693399799000000000,
             take_bids: false,
             min_bid_price: None,
+            vesting: None,
         };
 
         let path = order_path(
@@ -1426,6 +1440,7 @@ mod tests {
                 maker_fee: 10,
                 taker_fee: 10,
                 treasury: "".to_string(),
+                vesting_contract: "".to_string(),
             },
         )
         .unwrap();

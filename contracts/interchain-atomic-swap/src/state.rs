@@ -7,6 +7,7 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 pub const CHANNEL_INFO: Map<&str, ChannelInfo> = Map::new("channel_info");
 pub const FEE_INFO: Item<FeeInfo> = Item::new("fee_info");
+pub const CONFIG: Item<Config> = Item::new("config");
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct FeeInfo {
@@ -15,6 +16,10 @@ pub struct FeeInfo {
     pub maker_fee: u64,
     pub taker_fee: u64,
     pub treasury: String,
+}
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct Config {
+    pub vesting: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -58,6 +63,41 @@ pub struct AtomicSwapOrder {
     pub cancel_timestamp: Option<Timestamp>,
     pub complete_timestamp: Option<Timestamp>,
     pub min_bid_price: Option<Uint128>,
+    pub vesting_details: Option<VestingDetail>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VestingDetail {
+    // List of intervals and amount, after each interval certain amount will be released
+    pub schedules: Vec<ReleaseInterval>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct VestingDetails {
+    // start_time: after this timestamp vesting will start
+    pub start_time: u64,
+    // List of intervals and amount, after each interval certain amount will be released
+    pub schedules: Vec<ReleaseInterval>,
+    // token receiver, can claim tokens
+    pub receiver: String,
+    // total amount of tokens,
+    pub token: Coin,
+    // total claimed
+    pub amount_claimed: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct ReleaseInterval {
+    pub interval: u64,
+    pub amount: Uint128,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub enum VestingExecuteMsg {
+    StartVesting {
+        vesting: VestingDetails,
+        order_id: String,
+    },
 }
 
 pub const SWAP_ORDERS: Map<u64, AtomicSwapOrder> = Map::new("swap_order");

@@ -7,7 +7,7 @@ use cw20::Cw20Coin;
 
 use cosmwasm_std::{Binary, Coin, Timestamp, Uint128};
 
-use crate::state::{AtomicSwapOrder, Bid, BidStatus, Status};
+use crate::state::{AtomicSwapOrder, Bid, BidStatus, Status, VestingDetail};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Height {
@@ -23,6 +23,7 @@ pub struct InstantiateMsg {
     pub maker_fee: u64,
     pub taker_fee: u64,
     pub treasury: String,
+    pub vesting_contract: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -94,6 +95,8 @@ pub struct MakeSwapMsg {
     pub take_bids: bool,
     /// Minimum price required to create bid for this order.
     pub min_bid_price: Option<Uint128>,
+
+    pub vesting: Option<VestingDetail>,
 
     pub timeout_height: Height,
     pub timeout_timestamp: u64,

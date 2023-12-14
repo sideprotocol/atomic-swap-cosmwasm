@@ -9,13 +9,14 @@ use crate::{
     },
     state::{
         append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom,
-        set_atomic_order, AtomicSwapOrder, Bid, BidStatus, Side, Status, ORDER_TO_COUNT,
+        set_atomic_order, AtomicSwapOrder, Bid, BidStatus, Side, Status, VestingDetails,
+        VestingExecuteMsg::StartVesting, CONFIG, ORDER_TO_COUNT,
     },
     utils::{decode_make_swap_msg, decode_take_swap_msg, maker_fee, send_tokens, taker_fee},
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Binary, DepsMut, Env, IbcBasicResponse, IbcPacket,
-    IbcReceiveResponse, SubMsg, Timestamp,
+    IbcReceiveResponse, SubMsg, Timestamp, Uint128, WasmMsg,
 };
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
@@ -99,6 +100,7 @@ pub(crate) fn on_received_make(
         path,
         create_timestamp: env.block.time.seconds(),
         min_bid_price: msg.min_bid_price,
+        vesting_details: msg.vesting,
     };
 
     let count_check = ORDER_TO_COUNT.may_load(deps.storage, &order_id)?;
@@ -144,10 +146,32 @@ pub(crate) fn on_received_take(
         &swap_order.maker.sell_token.amount,
         swap_order.maker.sell_token.denom.clone(),
     );
-    let submsg: Vec<SubMsg> = vec![
-        send_tokens(&taker_receiving_address, taker_amount)?,
-        send_tokens(&treasury, fee)?,
-    ];
+    let mut submsg: Vec<SubMsg> = vec![send_tokens(&treasury, fee)?];
+    // Vesting details and check
+    if let Some(val) = swap_order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
+        // Call to vesting contract
+        let vesting_call = VestingDetails {
+            start_time: env.block.time.seconds(),
+            schedules: val.schedules,
+            receiver: taker_receiving_address.to_string(),
+            token: taker_amount.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+            order_id: swap_order.id.clone(),
+        };
+
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting,
+            msg: to_json_binary(&vesting_msg)?,
+            funds: vec![taker_amount],
+        }));
+    } else {
+        submsg.push(send_tokens(&taker_receiving_address, taker_amount)?);
+    }
 
     swap_order.status = Status::Complete;
     swap_order.taker = Some(msg.clone());
@@ -254,10 +278,37 @@ pub(crate) fn on_received_take_bid(
 
     let taker_receiving_address = deps.api.addr_validate(&bid.bidder_receiver)?;
 
-    let submsg: Vec<SubMsg> = vec![send_tokens(
-        &taker_receiving_address,
-        swap_order.maker.sell_token.clone(),
-    )?];
+    let (fee, taker_amount, treasury) = taker_fee(
+        deps.as_ref(),
+        &swap_order.maker.sell_token.amount,
+        swap_order.maker.sell_token.denom.clone(),
+    );
+    let mut submsg: Vec<SubMsg> = vec![send_tokens(&treasury, fee)?];
+    // Vesting details and check
+    if let Some(val) = swap_order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
+        // Call to vesting contract
+        let vesting_call = VestingDetails {
+            start_time: env.block.time.seconds(),
+            schedules: val.schedules,
+            receiver: taker_receiving_address.to_string(),
+            token: taker_amount.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+            order_id: swap_order.id.clone(),
+        };
+
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting,
+            msg: to_json_binary(&vesting_msg)?,
+            funds: vec![taker_amount],
+        }));
+    } else {
+        submsg.push(send_tokens(&taker_receiving_address, taker_amount)?);
+    }
 
     let take_msg: TakeSwapMsg = TakeSwapMsg {
         order_id: order_id.clone(),
