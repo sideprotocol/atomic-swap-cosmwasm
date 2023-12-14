@@ -9,7 +9,8 @@ use crate::{
     },
     state::{
         append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom,
-        set_atomic_order, AtomicSwapOrder, Bid, BidStatus, Side, Status, ORDER_TO_COUNT,
+        set_atomic_order, AtomicSwapOrder, Bid, BidStatus, Side, Status, VestingDetails,
+        VestingExecuteMsg::StartVesting, CONFIG, ORDER_TO_COUNT,
     },
     utils::{decode_make_swap_msg, decode_take_swap_msg, maker_fee, send_tokens, taker_fee},
 };
@@ -99,6 +100,7 @@ pub(crate) fn on_received_make(
         path,
         create_timestamp: env.block.time.seconds(),
         min_bid_price: msg.min_bid_price,
+        vesting_details: msg.vesting,
     };
 
     let count_check = ORDER_TO_COUNT.may_load(deps.storage, &order_id)?;
@@ -144,11 +146,9 @@ pub(crate) fn on_received_take(
         &swap_order.maker.sell_token.amount,
         swap_order.maker.sell_token.denom.clone(),
     );
-    let submsg: Vec<SubMsg> = vec![
-        send_tokens(&treasury, fee)?,
-    ];
-    // TODO: Vesting details
-    if let Some(val) = order.vesting_details.clone() {
+    let mut submsg: Vec<SubMsg> = vec![send_tokens(&treasury, fee)?];
+    // Vesting details and check
+    if let Some(val) = swap_order.vesting_details.clone() {
         let cfg = CONFIG.load(deps.storage)?;
         // Call to vesting contract
         let vesting_call = VestingDetails {
@@ -161,11 +161,11 @@ pub(crate) fn on_received_take(
 
         let vesting_msg = StartVesting {
             vesting: vesting_call,
-            order_id: order.id.clone(),
+            order_id: swap_order.id.clone(),
         };
 
         submsg.push(SubMsg::new(WasmMsg::Execute {
-            contract_addr: cfg.vesting_contract,
+            contract_addr: cfg.vesting,
             msg: to_json_binary(&vesting_msg)?,
             funds: vec![taker_amount],
         }));
