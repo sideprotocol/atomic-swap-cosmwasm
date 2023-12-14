@@ -20,7 +20,7 @@ use crate::query_reverse::{
 use crate::state::{
     append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
     AtomicSwapOrder, Bid, BidKey, BidStatus, FeeInfo, Side, Status, CHANNEL_INFO, COUNT, FEE_INFO,
-    INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
+    INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE, CONFIG, Config,
 };
 use crate::utils::{extract_source_channel_for_taker_msg, generate_order_id, order_path};
 use cw_storage_plus::Bound;
@@ -41,6 +41,7 @@ pub fn instantiate(
     COUNT.save(deps.storage, &0u64)?;
     INACTIVE_COUNT.save(deps.storage, &0u64)?;
     SWAP_SEQUENCE.save(deps.storage, &0u64)?;
+    CONFIG.save(deps.storage, &Config{vesting: msg.vesting_contract})?;
 
     let fee = FeeInfo {
         maker_fee: msg.maker_fee,

@@ -7,6 +7,7 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 pub const CHANNEL_INFO: Map<&str, ChannelInfo> = Map::new("channel_info");
 pub const FEE_INFO: Item<FeeInfo> = Item::new("fee_info");
+pub const CONFIG: Item<Config> = Item::new("config");
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct FeeInfo {
@@ -15,6 +16,10 @@ pub struct FeeInfo {
     pub maker_fee: u64,
     pub taker_fee: u64,
     pub treasury: String,
+}
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub struct Config {
+    pub vesting: String
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

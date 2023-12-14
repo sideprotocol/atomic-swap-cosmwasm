@@ -23,6 +23,7 @@ pub struct InstantiateMsg {
     pub maker_fee: u64,
     pub taker_fee: u64,
     pub treasury: String,
+    pub vesting_contract: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

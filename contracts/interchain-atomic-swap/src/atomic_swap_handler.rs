@@ -15,7 +15,7 @@ use crate::{
 };
 use cosmwasm_std::{
     attr, from_json, to_json_binary, Addr, Binary, DepsMut, Env, IbcBasicResponse, IbcPacket,
-    IbcReceiveResponse, SubMsg, Timestamp,
+    IbcReceiveResponse, SubMsg, Timestamp, Uint128, WasmMsg,
 };
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
@@ -145,9 +145,33 @@ pub(crate) fn on_received_take(
         swap_order.maker.sell_token.denom.clone(),
     );
     let submsg: Vec<SubMsg> = vec![
-        send_tokens(&taker_receiving_address, taker_amount)?,
         send_tokens(&treasury, fee)?,
     ];
+    // TODO: Vesting details
+    if let Some(val) = order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
+        // Call to vesting contract
+        let vesting_call = VestingDetails {
+            start_time: env.block.time.seconds(),
+            schedules: val.schedules,
+            receiver: taker_receiving_address.to_string(),
+            token: taker_amount.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+            order_id: order.id.clone(),
+        };
+
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting_contract,
+            msg: to_json_binary(&vesting_msg)?,
+            funds: vec![taker_amount],
+        }));
+    } else {
+        submsg.push(send_tokens(&taker_receiving_address, taker_amount)?);
+    }
 
     swap_order.status = Status::Complete;
     swap_order.taker = Some(msg.clone());
