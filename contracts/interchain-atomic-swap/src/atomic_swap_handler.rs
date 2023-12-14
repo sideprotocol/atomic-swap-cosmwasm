@@ -278,10 +278,37 @@ pub(crate) fn on_received_take_bid(
 
     let taker_receiving_address = deps.api.addr_validate(&bid.bidder_receiver)?;
 
-    let submsg: Vec<SubMsg> = vec![send_tokens(
-        &taker_receiving_address,
-        swap_order.maker.sell_token.clone(),
-    )?];
+    let (fee, taker_amount, treasury) = taker_fee(
+        deps.as_ref(),
+        &swap_order.maker.sell_token.amount,
+        swap_order.maker.sell_token.denom.clone(),
+    );
+    let mut submsg: Vec<SubMsg> = vec![send_tokens(&treasury, fee)?];
+    // Vesting details and check
+    if let Some(val) = swap_order.vesting_details.clone() {
+        let cfg = CONFIG.load(deps.storage)?;
+        // Call to vesting contract
+        let vesting_call = VestingDetails {
+            start_time: env.block.time.seconds(),
+            schedules: val.schedules,
+            receiver: taker_receiving_address.to_string(),
+            token: taker_amount.clone(),
+            amount_claimed: Uint128::from(0u64),
+        };
+
+        let vesting_msg = StartVesting {
+            vesting: vesting_call,
+            order_id: swap_order.id.clone(),
+        };
+
+        submsg.push(SubMsg::new(WasmMsg::Execute {
+            contract_addr: cfg.vesting,
+            msg: to_json_binary(&vesting_msg)?,
+            funds: vec![taker_amount],
+        }));
+    } else {
+        submsg.push(send_tokens(&taker_receiving_address, taker_amount)?);
+    }
 
     let take_msg: TakeSwapMsg = TakeSwapMsg {
         order_id: order_id.clone(),
