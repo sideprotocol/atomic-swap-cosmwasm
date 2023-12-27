@@ -20,6 +20,7 @@ pub struct Height {
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
+    pub admin: String,
     pub vesting_contract: String,
 }
 
@@ -31,6 +32,8 @@ pub enum ExecuteMsg {
     MakeBid(MakeBidMsg),
     TakeBid(TakeBidMsg),
     CancelBid(CancelBidMsg),
+    PauseMarket,
+    UnpauseMarket,
 }
 
 pub fn is_valid_name(name: &str) -> bool {

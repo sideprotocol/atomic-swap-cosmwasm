@@ -34,17 +34,18 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    let admin_addr = deps.api.addr_validate(&msg.admin)?;
     COUNT.save(deps.storage, &0u64)?;
     INACTIVE_COUNT.save(deps.storage, &0u64)?;
     SWAP_SEQUENCE.save(deps.storage, &0u64)?;
     CONFIG.save(
         deps.storage,
         &Config {
-            admin: info.sender.to_string(),
+            admin: admin_addr.to_string(),
             vesting_contract: msg.vesting_contract,
         },
     )?;
@@ -65,7 +66,25 @@ pub fn execute(
         ExecuteMsg::MakeBid(msg) => execute_make_bid(deps, env, info, msg),
         ExecuteMsg::TakeBid(msg) => execute_take_bid(deps, env, info, msg),
         ExecuteMsg::CancelBid(msg) => execute_cancel_bid(deps, env, info, msg),
+        ExecuteMsg::PauseMarket => execute_pause_market(deps, env, info),
+        ExecuteMsg::UnpauseMarket => execute_unpause_market(deps, env, info),
     }
+}
+
+pub fn execute_pause_market(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    Ok(Response::new().add_attribute("action", "pause_market"))
+}
+
+pub fn execute_unpause_market(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    Ok(Response::new().add_attribute("action", "unpause_market"))
 }
 
 // MakeSwap is called when the maker wants to make atomic swap. The method create new order and lock tokens.
@@ -1145,6 +1164,7 @@ mod tests {
 
         // Instantiate an empty contract
         let instantiate_msg = InstantiateMsg {
+            admin: "admin".to_string(),
             vesting_contract: "vesting-address".to_string(),
         };
         let info = mock_info("anyone", &[]);
@@ -1158,6 +1178,7 @@ mod tests {
 
         // Instantiate an empty contract
         let instantiate_msg = InstantiateMsg {
+            admin: "admin".to_string(),
             vesting_contract: "vesting-address".to_string(),
         };
         let info = mock_info("anyone", &[]);
@@ -1324,6 +1345,7 @@ mod tests {
             env.clone(),
             info,
             InstantiateMsg {
+                admin: "admin".to_string(),
                 vesting_contract: "vesting-address".to_string(),
             },
         )
@@ -1361,6 +1383,7 @@ mod tests {
             env,
             info,
             InstantiateMsg {
+                admin: "admin".to_string(),
                 vesting_contract: "vesting-address".to_string(),
             },
         )
@@ -1411,6 +1434,7 @@ mod tests {
             env,
             info,
             InstantiateMsg {
+                admin: "admin".to_string(),
                 vesting_contract: "vesting-address".to_string(),
             },
         )
