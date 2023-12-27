@@ -21,7 +21,7 @@ use crate::query_reverse::{
 use crate::state::{
     append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
     AtomicSwapOrder, Bid, BidKey, BidStatus, Config, Status, CONFIG, COUNT, INACTIVE_COUNT,
-    INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE,
+    INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE, MarketState,
 };
 use crate::utils::{maker_fee, send_tokens, taker_fee};
 use cw_storage_plus::Bound;
@@ -47,6 +47,7 @@ pub fn instantiate(
         &Config {
             admin: admin_addr.to_string(),
             vesting_contract: msg.vesting_contract,
+            state: MarketState::Active,
         },
     )?;
     Ok(Response::default())
@@ -73,17 +74,31 @@ pub fn execute(
 
 pub fn execute_pause_market(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    let mut cfg = CONFIG.load(deps.storage)?;
+    if cfg.admin != info.sender {
+        return Err(ContractError::Std(StdError::generic_err("only admin allowed".to_string())));
+    }
+    cfg.state = MarketState::Paused;
+    CONFIG.save(deps.storage, &cfg)?;
+
     Ok(Response::new().add_attribute("action", "pause_market"))
 }
 
 pub fn execute_unpause_market(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
+    let mut cfg = CONFIG.load(deps.storage)?;
+    if cfg.admin != info.sender {
+        return Err(ContractError::Std(StdError::generic_err("only admin allowed".to_string())));
+    }
+    cfg.state = MarketState::Active;
+    CONFIG.save(deps.storage, &cfg)?;
+
     Ok(Response::new().add_attribute("action", "unpause_market"))
 }
 
@@ -95,6 +110,11 @@ pub fn execute_make_swap(
     info: MessageInfo,
     msg: MakeSwapMsg,
 ) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
     // check if given tokens are received here
     let mut ok = false;
     // First token in this chain only first token needs to be verified
@@ -154,6 +174,11 @@ pub fn execute_take_swap(
     info: MessageInfo,
     msg: TakeSwapMsg,
 ) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
     // check if given tokens are received here
     let mut ok = false;
     // First token in this chain only first token needs to be verified
@@ -264,6 +289,11 @@ pub fn execute_cancel_swap(
     info: MessageInfo,
     msg: CancelSwapMsg,
 ) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
     let sender = info.sender.to_string();
     let mut order = get_atomic_order(deps.storage, &msg.order_id)?;
 
@@ -311,6 +341,11 @@ pub fn execute_make_bid(
     info: MessageInfo,
     msg: MakeBidMsg,
 ) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
     let sender = info.sender.to_string();
     let order = get_atomic_order(deps.storage, &msg.order_id)?;
     // check if given tokens are received here
@@ -391,6 +426,11 @@ pub fn execute_take_bid(
     info: MessageInfo,
     msg: TakeBidMsg,
 ) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
     let sender = info.sender.to_string();
     let mut order = get_atomic_order(deps.storage, &msg.order_id)?;
 
@@ -497,6 +537,11 @@ pub fn execute_cancel_bid(
     info: MessageInfo,
     msg: CancelBidMsg,
 ) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
     let sender = info.sender.to_string();
     let order = get_atomic_order(deps.storage, &msg.order_id)?;
 

@@ -50,6 +50,7 @@ pub struct AtomicSwapOrder {
 pub struct Config {
     pub vesting_contract: String,
     pub admin: String,
+    pub state: MarketState,
 }
 
 pub const CONFIG: Item<Config> = Item::new("config");
@@ -115,6 +116,12 @@ pub fn move_order_to_bottom(storage: &mut dyn Storage, order_id: &str) -> StdRes
     INACTIVE_SWAP_ORDERS.save(storage, count, &swap_order)?;
     INACTIVE_COUNT.save(storage, &(count + 1))?;
     Ok(id)
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub enum MarketState {
+    Paused,
+    Active,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
