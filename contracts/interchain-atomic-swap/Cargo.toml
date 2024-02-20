@@ -1,6 +1,6 @@
 [package]
 name = "ics100"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Implementation of Atomic Swaps"
 license = "Apache-2.0"
