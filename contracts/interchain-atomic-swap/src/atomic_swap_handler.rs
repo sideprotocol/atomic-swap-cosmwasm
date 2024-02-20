@@ -185,7 +185,8 @@ pub(crate) fn on_received_take(
         .add_submessages(submsg)
         .add_attribute("order_id", order_id)
         .add_attribute("action", "receive")
-        .add_attribute("success", "true");
+        .add_attribute("success", "true")
+        .add_attribute("action", "take_swap_received");
 
     Ok(res)
 }
@@ -219,7 +220,8 @@ pub(crate) fn on_received_cancel(
         .set_ack(ack_success())
         .add_attribute("order_id", order_id)
         .add_attribute("action", "receive")
-        .add_attribute("success", "true");
+        .add_attribute("success", "true")
+        .add_attribute("action", "cancel_swap_received");
 
     Ok(res)
 }
@@ -249,7 +251,8 @@ pub(crate) fn on_received_make_bid(
         .set_ack(ack_success())
         .add_attribute("order_id", order_id)
         .add_attribute("action", "receive")
-        .add_attribute("success", "true");
+        .add_attribute("success", "true")
+        .add_attribute("action", "make_bid_received");
 
     Ok(res)
 }
@@ -334,7 +337,8 @@ pub(crate) fn on_received_take_bid(
         .add_submessages(submsg)
         .add_attribute("order_id", order_id)
         .add_attribute("action", "receive")
-        .add_attribute("success", "true");
+        .add_attribute("success", "true")
+        .add_attribute("action", "take_bid_received");
 
     Ok(res)
 }
@@ -359,7 +363,8 @@ pub(crate) fn on_received_cancel_bid(
         .set_ack(ack_success())
         .add_attribute("order_id", order_id)
         .add_attribute("action", "receive")
-        .add_attribute("success", "true");
+        .add_attribute("success", "true")
+        .add_attribute("action", "cancel_bid_received");
 
     Ok(res)
 }
