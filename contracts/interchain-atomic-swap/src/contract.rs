@@ -2,7 +2,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_json_binary, Binary, Deps, DepsMut, Env, IbcMsg, IbcTimeout, MessageInfo, Order, Response,
-    StdError, StdResult,
+    StdError, StdResult, Uint128,
 };
 
 use cw2::set_contract_version;
@@ -97,6 +97,18 @@ pub fn execute_make_swap(
             "Funds mismatch: Funds mismatched to with message and sent values: Make swap"
                 .to_string(),
         )));
+    }
+
+    if let Some(val) = msg.vesting.clone() {
+        let mut total_amount = Uint128::from(0u64);
+        for schedule in val.schedules {
+            total_amount += schedule.amount;
+        }
+        if total_amount != Uint128::from(10000u64) {
+            return Err(ContractError::Std(StdError::generic_err(
+                "Total amount of tokens is not equal to 10000".to_string(),
+            )));
+        }
     }
 
     // Add swap message

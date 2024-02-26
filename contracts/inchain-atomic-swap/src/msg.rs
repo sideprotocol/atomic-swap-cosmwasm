@@ -21,6 +21,9 @@ pub struct Height {
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
     pub admin: String,
+    pub maker_fee: u64,
+    pub taker_fee: u64,
+    pub treasury: String,
     pub vesting_contract: String,
 }
 
@@ -97,7 +100,7 @@ pub struct VestingDetails {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ReleaseInterval {
     pub interval: u64,
-    pub amount: Uint128, // in %age, total of all amount should be 10000
+    pub amount: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
