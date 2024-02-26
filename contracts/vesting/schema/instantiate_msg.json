@@ -3,14 +3,25 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "contract",
-    "max_length"
+    "allowed_addresses",
+    "name",
+    "symbol",
+    "token_code_id"
   ],
   "properties": {
-    "contract": {
+    "allowed_addresses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "name": {
       "type": "string"
     },
-    "max_length": {
+    "symbol": {
+      "type": "string"
+    },
+    "token_code_id": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0

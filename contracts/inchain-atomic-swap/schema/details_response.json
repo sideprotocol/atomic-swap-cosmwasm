@@ -5,7 +5,6 @@
   "required": [
     "id",
     "maker",
-    "path",
     "status"
   ],
   "properties": {
@@ -34,9 +33,6 @@
     },
     "maker": {
       "$ref": "#/definitions/MakeSwapMsg"
-    },
-    "path": {
-      "type": "string"
     },
     "status": {
       "$ref": "#/definitions/Status"
@@ -68,25 +64,6 @@
         }
       }
     },
-    "Height": {
-      "type": "object",
-      "required": [
-        "revision_height",
-        "revision_number"
-      ],
-      "properties": {
-        "revision_height": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "revision_number": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        }
-      }
-    },
     "MakeSwapMsg": {
       "type": "object",
       "required": [
@@ -94,20 +71,15 @@
         "desired_taker",
         "expiration_timestamp",
         "maker_address",
-        "maker_receiving_address",
         "sell_token",
-        "source_channel",
-        "source_port",
-        "take_bids",
-        "timeout_height",
-        "timeout_timestamp"
+        "take_bids"
       ],
       "properties": {
         "buy_token": {
           "$ref": "#/definitions/Coin"
         },
         "desired_taker": {
-          "description": "if desired_taker is specified, only the desired_taker is allowed to take this order this is address on destination chain",
+          "description": "if desired_taker is specified, only the desired_taker is allowed to take this order",
           "type": "string"
         },
         "expiration_timestamp": {
@@ -119,9 +91,16 @@
           "description": "the sender address",
           "type": "string"
         },
-        "maker_receiving_address": {
-          "description": "the sender's address on the destination chain",
-          "type": "string"
+        "min_bid_price": {
+          "description": "Minimum price required to create bid for this order.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Uint128"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "sell_token": {
           "description": "the tokens to be sold",
@@ -131,22 +110,34 @@
             }
           ]
         },
-        "source_channel": {
-          "description": "the channel by which the packet will be sent",
-          "type": "string"
-        },
-        "source_port": {
-          "description": "the port on which the packet will be sent",
-          "type": "string"
-        },
         "take_bids": {
           "description": "Allow makers to receive bids for the order",
           "type": "boolean"
         },
-        "timeout_height": {
-          "$ref": "#/definitions/Height"
+        "vesting_details": {
+          "description": "None if vesting is disabled",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/VestingDetail"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ReleaseInterval": {
+      "type": "object",
+      "required": [
+        "amount",
+        "interval"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
         },
-        "timeout_timestamp": {
+        "interval": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
@@ -168,10 +159,7 @@
       "required": [
         "order_id",
         "sell_token",
-        "taker_address",
-        "taker_receiving_address",
-        "timeout_height",
-        "timeout_timestamp"
+        "taker_address"
       ],
       "properties": {
         "order_id": {
@@ -188,24 +176,6 @@
         "taker_address": {
           "description": "the sender address",
           "type": "string"
-        },
-        "taker_receiving_address": {
-          "description": "the sender's address on the destination chain",
-          "type": "string"
-        },
-        "timeout_height": {
-          "description": "Timeout height relative to the current block height. The timeout is disabled when set to 0.",
-          "allOf": [
-            {
-              "$ref": "#/definitions/Height"
-            }
-          ]
-        },
-        "timeout_timestamp": {
-          "description": "Timeout timestamp in absolute nanoseconds since unix epoch. The timeout is disabled when set to 0.",
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
         }
       }
     },
@@ -224,6 +194,20 @@
     "Uint64": {
       "description": "A thin wrapper around u64 that is using strings for JSON encoding/decoding, such that the full u64 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u64` to get the value out:\n\n``` # use cosmwasm_std::Uint64; let a = Uint64::from(42u64); assert_eq!(a.u64(), 42);\n\nlet b = Uint64::from(70u32); assert_eq!(b.u64(), 70); ```",
       "type": "string"
+    },
+    "VestingDetail": {
+      "type": "object",
+      "required": [
+        "schedules"
+      ],
+      "properties": {
+        "schedules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReleaseInterval"
+          }
+        }
+      }
     }
   }
 }

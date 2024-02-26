@@ -21,6 +21,9 @@ pub struct Height {
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct InstantiateMsg {
     pub admin: String,
+    pub maker_fee: u64,
+    pub taker_fee: u64,
+    pub treasury: String,
     pub vesting_contract: String,
 }
 
@@ -76,7 +79,7 @@ pub struct AtomicSwapPacketData {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VestingDetail {
-    // List of intervals and amount, after each interval certain amount will be released
+    // List of intervals and %age, after each interval certain amount will be released
     pub schedules: Vec<ReleaseInterval>,
 }
 

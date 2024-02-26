@@ -19,9 +19,7 @@ use crate::query_reverse::{
     query_list_reverse,
 };
 use crate::state::{
-    append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
-    AtomicSwapOrder, Bid, BidKey, BidStatus, Config, Status, CONFIG, COUNT, INACTIVE_COUNT,
-    INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE, MarketState,
+    append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order, AtomicSwapOrder, Bid, BidKey, BidStatus, Config, FeeInfo, MarketState, Status, CONFIG, COUNT, FEE_INFO, INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE
 };
 use crate::utils::{maker_fee, send_tokens, taker_fee};
 use cw_storage_plus::Bound;
@@ -50,6 +48,14 @@ pub fn instantiate(
             state: MarketState::Active,
         },
     )?;
+
+    let fee = FeeInfo {
+        maker_fee: msg.maker_fee,
+        taker_fee: msg.taker_fee,
+        treasury: msg.treasury,
+    };
+    FEE_INFO.save(deps.storage, &fee)?;
+
     Ok(Response::default())
 }
 
@@ -135,9 +141,9 @@ pub fn execute_make_swap(
         for schedule in val.schedules {
             total_amount += schedule.amount;
         }
-        if total_amount != msg.sell_token.amount {
+        if total_amount != Uint128::from(10000u64) {
             return Err(ContractError::Std(StdError::generic_err(
-                "Total amount of tokens is not equal to total vesting amount".to_string(),
+                "Total amount of tokens is not equal to 10000".to_string(),
             )));
         }
     }
@@ -1210,7 +1216,10 @@ mod tests {
         // Instantiate an empty contract
         let instantiate_msg = InstantiateMsg {
             admin: "admin".to_string(),
+            treasury: "tre".to_string(),
             vesting_contract: "vesting-address".to_string(),
+            maker_fee: 100,
+            taker_fee: 100
         };
         let info = mock_info("anyone", &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -1224,7 +1233,10 @@ mod tests {
         // Instantiate an empty contract
         let instantiate_msg = InstantiateMsg {
             admin: "admin".to_string(),
+            treasury: "tre".to_string(),
             vesting_contract: "vesting-address".to_string(),
+            maker_fee: 100,
+            taker_fee: 100
         };
         let info = mock_info("anyone", &[]);
         let res = instantiate(deps.as_mut(), mock_env(), info, instantiate_msg).unwrap();
@@ -1391,7 +1403,10 @@ mod tests {
             info,
             InstantiateMsg {
                 admin: "admin".to_string(),
+                treasury: "tre".to_string(),
                 vesting_contract: "vesting-address".to_string(),
+                maker_fee: 100,
+                taker_fee: 100
             },
         )
         .unwrap();
@@ -1429,7 +1444,10 @@ mod tests {
             info,
             InstantiateMsg {
                 admin: "admin".to_string(),
+                treasury: "tre".to_string(),
                 vesting_contract: "vesting-address".to_string(),
+                maker_fee: 100,
+                taker_fee: 100
             },
         )
         .unwrap();
@@ -1480,7 +1498,10 @@ mod tests {
             info,
             InstantiateMsg {
                 admin: "admin".to_string(),
+                treasury: "tre".to_string(),
                 vesting_contract: "vesting-address".to_string(),
+                maker_fee: 100,
+                taker_fee: 100
             },
         )
         .unwrap();
