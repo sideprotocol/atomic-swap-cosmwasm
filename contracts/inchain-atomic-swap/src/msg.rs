@@ -76,7 +76,7 @@ pub struct AtomicSwapPacketData {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct VestingDetail {
-    // List of intervals and amount, after each interval certain amount will be released
+    // List of intervals and %age, after each interval certain amount will be released
     pub schedules: Vec<ReleaseInterval>,
 }
 
@@ -97,7 +97,7 @@ pub struct VestingDetails {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct ReleaseInterval {
     pub interval: u64,
-    pub amount: Uint128,
+    pub amount: Uint128, // in %age, total of all amount should be 10000
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

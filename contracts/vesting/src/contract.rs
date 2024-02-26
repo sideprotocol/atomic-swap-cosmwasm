@@ -137,9 +137,9 @@ pub fn execute_start_vesting(
     for schedule in vesting.schedules.clone() {
         total_amount += schedule.amount;
     }
-    if total_amount != vesting.token.amount.clone() {
+    if total_amount != Uint128::from(10000u64) {
         return Err(ContractError::Std(StdError::generic_err(format!(
-            "Total amount of tokens is not equal to total vesting amount"
+            "Total amount of percentage is not equal to 10000"
         ))));
     }
 
@@ -231,7 +231,8 @@ pub fn execute_claim(
         for schedule in vesting.schedules.clone() {
             now_with_cliff += schedule.interval;
             if now_with_cliff <= now {
-                release_amount += schedule.amount;
+                let temp = schedule.amount.checked_mul(vesting.token.amount).unwrap();
+                release_amount += temp.checked_div(Uint128::from(10000u64)).unwrap();
             } else {
                 break;
             }
