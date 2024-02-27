@@ -136,7 +136,7 @@ pub fn execute_make_swap(
         )));
     }
 
-    if let Some(val) = msg.vesting_details.clone() {
+    if let Some(val) = msg.vesting.clone() {
         let mut total_amount = Uint128::from(0u64);
         for schedule in val.schedules {
             total_amount += schedule.amount;
@@ -160,7 +160,7 @@ pub fn execute_make_swap(
         complete_timestamp: None,
         create_timestamp: env.block.time.seconds(),
         min_bid_price: msg.min_bid_price,
-        vesting_details: msg.vesting_details,
+        vesting_details: msg.vesting,
     };
     append_atomic_order(deps.storage, &order_id, &new_order)?;
 
@@ -1428,7 +1428,7 @@ mod tests {
             expiration_timestamp: env.block.time.plus_seconds(100).nanos(),
             take_bids: false,
             min_bid_price: None,
-            vesting_details: None,
+            vesting: None,
         };
         let err = execute(deps.as_mut(), env, info, ExecuteMsg::MakeSwap(create)).unwrap_err();
         assert_eq!(err, ContractError::EmptyBalance {});
@@ -1472,7 +1472,7 @@ mod tests {
             expiration_timestamp: 1693399749000000000,
             take_bids: false,
             min_bid_price: None,
-            vesting_details: None,
+            vesting: None,
         };
 
         let path = order_path(
