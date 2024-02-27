@@ -168,7 +168,9 @@ pub fn execute_make_swap(
     let new_sequence = sequence + 1;
     SWAP_SEQUENCE.save(deps.storage, &new_sequence)?;
 
-    let res = Response::new().add_attribute("action", "make_swap");
+    let res = Response::new()
+    .add_attribute("order_id", order_id)
+    .add_attribute("action", "make_swap");
     Ok(res)
 }
 

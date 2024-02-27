@@ -140,7 +140,7 @@ pub fn execute_make_swap(
     let ibc_packet = AtomicSwapPacketData {
         r#type: SwapMessageType::MakeSwap,
         data: to_json_binary(&msg)?,
-        order_id: Some(order_id),
+        order_id: Some(order_id.clone()),
         path: Some(path),
         memo: String::new(),
     };
@@ -161,6 +161,7 @@ pub fn execute_make_swap(
 
     let res = Response::new()
         .add_message(ibc_msg)
+        .add_attribute("order_id", order_id)
         .add_attribute("action", "make_swap");
     Ok(res)
 }
