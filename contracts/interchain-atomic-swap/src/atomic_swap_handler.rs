@@ -375,7 +375,7 @@ pub(crate) fn on_packet_success(
     packet: IbcPacket,
     env: Env,
 ) -> Result<IbcBasicResponse, ContractError> {
-    let packet_data: AtomicSwapPacketData = from_json(&packet.data)?;
+    let packet_data: AtomicSwapPacketData = from_json(packet.data)?;
 
     // similar event messages like ibctransfer module
     let attributes = vec![attr("action", "acknowledge"), attr("success", "true")];
@@ -527,7 +527,7 @@ pub(crate) fn on_packet_failure(
     packet: IbcPacket,
     err: String,
 ) -> Result<IbcBasicResponse, ContractError> {
-    let packet_data: AtomicSwapPacketData = from_json(&packet.data)?;
+    let packet_data: AtomicSwapPacketData = from_json(packet.data)?;
     let submsg = refund_packet_token(deps, packet_data)?;
 
     let res = IbcBasicResponse::new()
