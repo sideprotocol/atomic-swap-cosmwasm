@@ -10,9 +10,7 @@ use cw2::set_contract_version;
 use crate::error::ContractError;
 use crate::msg::VestingExecuteMsg::StartVesting;
 use crate::msg::{
-    BidOffset, BidOffsetTime, BidsResponse, CancelBidMsg, CancelSwapMsg, DetailsResponse,
-    ExecuteMsg, InstantiateMsg, ListResponse, MakeBidMsg, MakeSwapMsg, MigrateMsg, QueryMsg,
-    TakeBidMsg, TakeSwapMsg, VestingDetails,
+    BidOffset, BidOffsetTime, BidsResponse, CancelBidMsg, CancelSwapMsg, DetailsResponse, ExecuteMsg, InstantiateMsg, ListResponse, MakeBidMsg, MakeSwapMsg, MigrateMsg, QueryMsg, TakeBidMsg, TakeSwapMsg, UpdateBidMsg, VestingDetails
 };
 use crate::query_reverse::{
     query_list_by_desired_taker_reverse, query_list_by_maker_reverse, query_list_by_taker_reverse,
@@ -73,6 +71,7 @@ pub fn execute(
         ExecuteMsg::MakeBid(msg) => execute_make_bid(deps, env, info, msg),
         ExecuteMsg::TakeBid(msg) => execute_take_bid(deps, env, info, msg),
         ExecuteMsg::CancelBid(msg) => execute_cancel_bid(deps, env, info, msg),
+        ExecuteMsg::UpdateBid(msg) => execute_update_bid(deps, env, info, msg),
         ExecuteMsg::PauseMarket => execute_pause_market(deps, env, info),
         ExecuteMsg::UnpauseMarket => execute_unpause_market(deps, env, info),
     }
@@ -532,6 +531,66 @@ pub fn execute_take_bid(
         .add_submessages(submsg)
         .add_attribute("order_id", msg.order_id)
         .add_attribute("action", "take_bid");
+    Ok(res)
+}
+
+pub fn execute_update_bid(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: UpdateBidMsg,
+) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
+    let bidder = info.sender.to_string();
+    let order = get_atomic_order(deps.storage, &msg.order_id)?;
+
+    // check if given tokens are received here
+    let mut ok = false;
+    // First token in this chain only first token needs to be verified
+    for asset in info.funds {
+        if asset.denom == order.maker.buy_token.denom && msg.addition == asset.amount {
+            ok = true;
+        }
+    }
+    if !ok {
+        return Err(ContractError::Std(StdError::generic_err(
+            "Funds mismatch: Funds mismatched to with message and sent values: Make swap"
+                .to_string(),
+        )));
+    }
+
+    let key = bid_key(&msg.order_id, &bidder);
+    if !bids().has(deps.storage, key.clone()) {
+        return Err(ContractError::BidDoesntExist);
+    }
+
+    let mut bid = bids().load(deps.storage, key.clone())?;
+    if bid.status != BidStatus::Placed {
+        return Err(ContractError::BidDoesntExist);
+    }
+
+    if env.block.time.seconds() > bid.expire_timestamp {
+        return Err(ContractError::Expired);
+    }
+
+    if msg.addition == Uint128::from(0u64) {
+        return Err(ContractError::InvalidBidAmount);
+    }
+
+    if bid.bid.amount + msg.addition > order.maker.buy_token.amount {
+        return Err(ContractError::InvalidBidAmount);
+    }
+
+    bid.bid.amount += msg.addition;
+    bids().save(deps.storage, key, &bid)?;
+
+    let res = Response::new()
+        .add_attribute("order_id", msg.order_id)
+        .add_attribute("action", "update_id");
     Ok(res)
 }
 
