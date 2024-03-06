@@ -35,6 +35,7 @@ pub enum ExecuteMsg {
     MakeBid(MakeBidMsg),
     TakeBid(TakeBidMsg),
     CancelBid(CancelBidMsg),
+    UpdateBid(UpdateBidMsg),
     PauseMarket,
     UnpauseMarket,
 }
@@ -127,7 +128,7 @@ pub struct MakeSwapMsg {
     pub min_bid_price: Option<Uint128>,
     pub expiration_timestamp: u64,
     /// None if vesting is disabled
-    pub vesting_details: Option<VestingDetail>,
+    pub vesting: Option<VestingDetail>,
 }
 
 impl fmt::Display for MakeSwapMsg {
@@ -194,6 +195,12 @@ pub struct TakeBidMsg {
 pub struct CancelBidMsg {
     pub order_id: String,
     pub bidder: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]
+pub struct UpdateBidMsg {
+    pub order_id: String,
+    pub addition: Uint128,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]

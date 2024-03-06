@@ -11,17 +11,14 @@ use crate::error::ContractError;
 use crate::msg::{
     AtomicSwapPacketData, BidOffset, BidOffsetTime, BidsResponse, CancelBidMsg, CancelSwapMsg,
     DetailsResponse, ExecuteMsg, InstantiateMsg, ListResponse, MakeBidMsg, MakeSwapMsg, MigrateMsg,
-    QueryMsg, SwapMessageType, TakeBidMsg, TakeSwapMsg,
+    QueryMsg, SwapMessageType, TakeBidMsg, TakeSwapMsg, UpdateBidMsg,
 };
 use crate::query_reverse::{
     query_list_by_desired_taker_reverse, query_list_by_maker_reverse, query_list_by_taker_reverse,
     query_list_reverse,
 };
 use crate::state::{
-    append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order,
-    AtomicSwapOrder, Bid, BidKey, BidStatus, Config, FeeInfo, Side, Status, CHANNEL_INFO, CONFIG,
-    COUNT, FEE_INFO, INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS,
-    SWAP_SEQUENCE,
+    append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom, set_atomic_order, AtomicSwapOrder, Bid, BidKey, BidStatus, Config, FeeInfo, MarketState, Side, Status, CHANNEL_INFO, CONFIG, COUNT, FEE_INFO, INACTIVE_COUNT, INACTIVE_SWAP_ORDERS, ORDER_TO_COUNT, SWAP_ORDERS, SWAP_SEQUENCE
 };
 use crate::utils::{extract_source_channel_for_taker_msg, generate_order_id, order_path};
 use cw_storage_plus::Bound;
@@ -35,7 +32,7 @@ const DEFAULT_TIMEOUT_TIMESTAMP_OFFSET: u64 = 600;
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -45,7 +42,9 @@ pub fn instantiate(
     CONFIG.save(
         deps.storage,
         &Config {
-            vesting: msg.vesting_contract,
+            vesting_contract: msg.vesting_contract,
+            admin: info.sender.to_string(),
+            state: MarketState::Active
         },
     )?;
 
@@ -73,7 +72,40 @@ pub fn execute(
         ExecuteMsg::MakeBid(msg) => execute_make_bid(deps, env, info, msg),
         ExecuteMsg::TakeBid(msg) => execute_take_bid(deps, env, info, msg),
         ExecuteMsg::CancelBid(msg) => execute_cancel_bid(deps, env, info, msg),
+        ExecuteMsg::UpdateBid(msg) => execute_update_bid(deps, env, info, msg),
+        ExecuteMsg::PauseMarket => execute_pause_market(deps, env, info),
+        ExecuteMsg::UnpauseMarket => execute_unpause_market(deps, env, info),
     }
+}
+
+pub fn execute_pause_market(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    let mut cfg = CONFIG.load(deps.storage)?;
+    if cfg.admin != info.sender {
+        return Err(ContractError::Std(StdError::generic_err("only admin allowed".to_string())));
+    }
+    cfg.state = MarketState::Paused;
+    CONFIG.save(deps.storage, &cfg)?;
+
+    Ok(Response::new().add_attribute("action", "pause_market"))
+}
+
+pub fn execute_unpause_market(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    let mut cfg = CONFIG.load(deps.storage)?;
+    if cfg.admin != info.sender {
+        return Err(ContractError::Std(StdError::generic_err("only admin allowed".to_string())));
+    }
+    cfg.state = MarketState::Active;
+    CONFIG.save(deps.storage, &cfg)?;
+
+    Ok(Response::new().add_attribute("action", "unpause_market"))
 }
 
 // MakeSwap is called when the maker wants to make atomic swap. The method create new order and lock tokens.
@@ -140,7 +172,7 @@ pub fn execute_make_swap(
     let ibc_packet = AtomicSwapPacketData {
         r#type: SwapMessageType::MakeSwap,
         data: to_json_binary(&msg)?,
-        order_id: Some(order_id),
+        order_id: Some(order_id.clone()),
         path: Some(path),
         memo: String::new(),
     };
@@ -161,6 +193,7 @@ pub fn execute_make_swap(
 
     let res = Response::new()
         .add_message(ibc_msg)
+        .add_attribute("order_id", order_id)
         .add_attribute("action", "make_swap");
     Ok(res)
 }
@@ -508,7 +541,89 @@ pub fn execute_cancel_bid(
     let res = Response::new()
         .add_message(ibc_msg)
         .add_attribute("order_id", msg.order_id)
-        .add_attribute("action", "make_bid");
+        .add_attribute("action", "cancel_bid");
+    Ok(res)
+}
+
+pub fn execute_update_bid(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: UpdateBidMsg,
+) -> Result<Response, ContractError> {
+    let cfg = CONFIG.load(deps.storage)?;
+    if cfg.state != MarketState::Active {
+        return Err(ContractError::Std(StdError::generic_err("market not active".to_string())));
+    }
+
+    if info.sender.to_string() != msg.bidder {
+        return Err(ContractError::InvalidSender);
+    }
+
+    let bidder = msg.bidder.clone();
+    let order = get_atomic_order(deps.storage, &msg.order_id)?;
+
+    // check if given tokens are received here
+    let mut ok = false;
+    // First token in this chain only first token needs to be verified
+    for asset in info.funds {
+        if asset.denom == order.maker.buy_token.denom && msg.addition == asset.amount {
+            ok = true;
+        }
+    }
+    if !ok {
+        return Err(ContractError::Std(StdError::generic_err(
+            "Funds mismatch: Funds mismatched to with message and sent values: Update bid"
+                .to_string(),
+        )));
+    }
+
+    let key = bid_key(&msg.order_id, &bidder);
+    if !bids().has(deps.storage, key.clone()) {
+        return Err(ContractError::BidDoesntExist);
+    }
+
+    let mut bid = bids().load(deps.storage, key.clone())?;
+    if bid.status != BidStatus::Placed {
+        return Err(ContractError::BidDoesntExist);
+    }
+
+    if env.block.time.seconds() > bid.expire_timestamp {
+        return Err(ContractError::Expired);
+    }
+
+    if msg.addition == Uint128::from(0u64) {
+        return Err(ContractError::InvalidBidAmount);
+    }
+
+    if bid.bid.amount + msg.addition > order.maker.buy_token.amount {
+        return Err(ContractError::InvalidBidAmount);
+    }
+
+    bid.bid.amount += msg.addition;
+
+    let packet = AtomicSwapPacketData {
+        r#type: SwapMessageType::UpdateBid,
+        data: to_json_binary(&msg)?,
+        memo: String::new(),
+        order_id: None,
+        path: None,
+    };
+
+    let ibc_msg = IbcMsg::SendPacket {
+        channel_id: extract_source_channel_for_taker_msg(&order.path)?,
+        data: to_json_binary(&packet)?,
+        timeout: IbcTimeout::from(
+            env.block
+                .time
+                .plus_seconds(DEFAULT_TIMEOUT_TIMESTAMP_OFFSET),
+        ),
+    };
+
+    let res = Response::new()
+        .add_message(ibc_msg)
+        .add_attribute("order_id", msg.order_id)
+        .add_attribute("action", "update_bid");
     Ok(res)
 }
 
@@ -1204,7 +1319,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids[0], bid);
 
         order = "some-order".to_owned();
@@ -1236,7 +1351,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids[0], bid);
 
         order = "some-order".to_owned();
@@ -1271,7 +1386,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids, vec![bid2.clone(), bid1]);
 
         let res = query(
@@ -1289,7 +1404,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids, vec![bid2, bid.clone()]);
 
         // Query by bidder
@@ -1323,7 +1438,7 @@ mod tests {
         )
         .unwrap();
 
-        let value: BidsResponse = from_json(&res).unwrap();
+        let value: BidsResponse = from_json(res).unwrap();
         assert_eq!(value.bids, vec![bid, bid3]);
     }
 
