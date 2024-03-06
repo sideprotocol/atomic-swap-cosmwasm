@@ -116,6 +116,7 @@ pub fn execute_make_swap(
     info: MessageInfo,
     msg: MakeSwapMsg,
 ) -> Result<Response, ContractError> {
+    deps.api.addr_validate(&msg.maker_address)?;
     // check if given tokens are received here
     let mut ok = false;
     // First token in this chain only first token needs to be verified
