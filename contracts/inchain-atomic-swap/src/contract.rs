@@ -558,7 +558,7 @@ pub fn execute_update_bid(
     }
     if !ok {
         return Err(ContractError::Std(StdError::generic_err(
-            "Funds mismatch: Funds mismatched to with message and sent values: Make swap"
+            "Funds mismatch: Funds mismatched to with message and sent values: Update bid"
                 .to_string(),
         )));
     }
@@ -590,7 +590,7 @@ pub fn execute_update_bid(
 
     let res = Response::new()
         .add_attribute("order_id", msg.order_id)
-        .add_attribute("action", "update_id");
+        .add_attribute("action", "update_bid");
     Ok(res)
 }
 

@@ -19,7 +19,9 @@ pub struct FeeInfo {
 }
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct Config {
-    pub vesting: String,
+    pub vesting_contract: String,
+    pub admin: String,
+    pub state: MarketState,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
@@ -98,6 +100,12 @@ pub enum VestingExecuteMsg {
         vesting: VestingDetails,
         order_id: String,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+pub enum MarketState {
+    Paused,
+    Active,
 }
 
 pub const SWAP_ORDERS: Map<u64, AtomicSwapOrder> = Map::new("swap_order");

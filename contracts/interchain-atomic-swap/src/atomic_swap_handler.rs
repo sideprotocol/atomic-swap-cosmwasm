@@ -5,7 +5,7 @@ use crate::{
     error::ContractError,
     msg::{
         AtomicSwapPacketData, CancelBidMsg, CancelSwapMsg, Height, MakeBidMsg, MakeSwapMsg,
-        SwapMessageType, TakeBidMsg, TakeSwapMsg,
+        SwapMessageType, TakeBidMsg, TakeSwapMsg, UpdateBidMsg,
     },
     state::{
         append_atomic_order, bid_key, bids, get_atomic_order, move_order_to_bottom,
@@ -15,8 +15,7 @@ use crate::{
     utils::{decode_make_swap_msg, decode_take_swap_msg, maker_fee, send_tokens, taker_fee},
 };
 use cosmwasm_std::{
-    attr, from_json, to_json_binary, Addr, Binary, DepsMut, Env, IbcBasicResponse, IbcPacket,
-    IbcReceiveResponse, SubMsg, Timestamp, Uint128, WasmMsg,
+    attr, from_json, to_json_binary, Addr, Binary, Coin, DepsMut, Env, IbcBasicResponse, IbcPacket, IbcReceiveResponse, SubMsg, Timestamp, Uint128, WasmMsg
 };
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
@@ -76,6 +75,10 @@ pub(crate) fn do_ibc_packet_receive(
         SwapMessageType::CancelBid => {
             let msg: CancelBidMsg = from_json(&packet_data.data)?;
             on_received_cancel_bid(deps, env, packet, msg)
+        }
+        SwapMessageType::UpdateBid => {
+            let msg: UpdateBidMsg = from_json(&packet_data.data)?;
+            on_received_update_bid(deps, env, packet, msg)
         }
     }
 }
@@ -165,7 +168,7 @@ pub(crate) fn on_received_take(
         };
 
         submsg.push(SubMsg::new(WasmMsg::Execute {
-            contract_addr: cfg.vesting,
+            contract_addr: cfg.vesting_contract,
             msg: to_json_binary(&vesting_msg)?,
             funds: vec![taker_amount],
         }));
@@ -305,7 +308,7 @@ pub(crate) fn on_received_take_bid(
         };
 
         submsg.push(SubMsg::new(WasmMsg::Execute {
-            contract_addr: cfg.vesting,
+            contract_addr: cfg.vesting_contract,
             msg: to_json_binary(&vesting_msg)?,
             funds: vec![taker_amount],
         }));
@@ -365,6 +368,41 @@ pub(crate) fn on_received_cancel_bid(
         .add_attribute("action", "receive")
         .add_attribute("success", "true")
         .add_attribute("action", "cancel_bid_received");
+
+    Ok(res)
+}
+
+pub(crate) fn on_received_update_bid(
+    deps: DepsMut,
+    env: Env,
+    _packet: &IbcPacket,
+    msg: UpdateBidMsg,
+) -> Result<IbcReceiveResponse, ContractError> {
+    let order_id = msg.order_id.clone();
+    let key = bid_key(&msg.order_id, &msg.bidder);
+
+    if !bids().has(deps.storage, key.clone()) {
+        return Err(ContractError::BidDoesntExist);
+    }
+
+    let mut bid = bids().load(deps.storage, key.clone())?;
+    if bid.status != BidStatus::Placed {
+        return Err(ContractError::BidDoesntExist);
+    }
+
+    if env.block.time.seconds() > bid.expire_timestamp {
+        return Err(ContractError::Expired);
+    }
+
+    bid.bid.amount += msg.addition;
+    bids().save(deps.storage, key, &bid)?;
+
+    let res = IbcReceiveResponse::new()
+        .set_ack(ack_success())
+        .add_attribute("order_id", order_id)
+        .add_attribute("action", "receive")
+        .add_attribute("success", "true")
+        .add_attribute("action", "update_bid_received");
 
     Ok(res)
 }
@@ -519,6 +557,17 @@ pub(crate) fn on_packet_success(
                 .add_submessages(submsg)
                 .add_attributes(attributes))
         }
+        SwapMessageType::UpdateBid => {
+            let msg: UpdateBidMsg = from_json(&packet_data.data)?;
+
+            let key = bid_key(&msg.order_id, &msg.bidder);
+            let mut bid = bids().load(deps.storage, key.clone())?;
+
+            bid.bid.amount += msg.addition;
+            bids().save(deps.storage, key, &bid)?;
+
+            Ok(IbcBasicResponse::new().add_attributes(attributes))
+        }
     }
 }
 
@@ -593,5 +642,14 @@ pub(crate) fn refund_packet_token(
         }
         SwapMessageType::TakeBid => Ok(vec![]),
         SwapMessageType::CancelBid => Ok(vec![]),
+        SwapMessageType::UpdateBid => {
+            let msg: UpdateBidMsg = from_json(&packet.data)?;
+            let taker_address: Addr = deps.api.addr_validate(&msg.bidder)?;
+            let key = bid_key(&msg.order_id, &taker_address.to_string());
+            let bid = bids().load(deps.storage, key.clone())?;
+        
+            let submsg = vec![send_tokens(&taker_address, Coin {denom: bid.bid.denom, amount: msg.addition})?];
+            Ok(submsg)
+        },
     }
 }

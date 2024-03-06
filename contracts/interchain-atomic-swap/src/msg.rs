@@ -34,6 +34,9 @@ pub enum ExecuteMsg {
     MakeBid(MakeBidMsg),
     TakeBid(TakeBidMsg),
     CancelBid(CancelBidMsg),
+    UpdateBid(UpdateBidMsg),
+    PauseMarket,
+    UnpauseMarket,
 }
 
 pub fn is_valid_name(name: &str) -> bool {
@@ -63,6 +66,8 @@ pub enum SwapMessageType {
     TakeBid = 5,
     #[serde(rename = "TYPE_MSG_CANCEL_BID")]
     CancelBid = 6,
+    #[serde(rename = "TYPE_MSG_UPDATE_BID")]
+    UpdateBid = 7,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -204,6 +209,13 @@ pub struct TakeBidMsg {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]
 pub struct CancelBidMsg {
     pub order_id: String,
+    pub bidder: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]
+pub struct UpdateBidMsg {
+    pub order_id: String,
+    pub addition: Uint128,
     pub bidder: String,
 }
 

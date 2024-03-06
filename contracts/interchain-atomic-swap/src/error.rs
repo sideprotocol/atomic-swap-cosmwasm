@@ -71,4 +71,7 @@ pub enum ContractError {
 
     #[error("Bid doesn't exist")]
     BidDoesntExist,
+
+    #[error("Invalid bid amount")]
+    InvalidBidAmount,
 }
