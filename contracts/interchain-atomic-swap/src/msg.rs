@@ -76,7 +76,6 @@ pub struct AtomicSwapPacketData {
     pub data: Binary,
     pub order_id: Option<String>,
     pub path: Option<String>,
-    pub memo: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, JsonSchema)]

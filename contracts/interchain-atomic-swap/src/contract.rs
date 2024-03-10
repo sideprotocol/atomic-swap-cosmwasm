@@ -174,7 +174,6 @@ pub fn execute_make_swap(
         data: to_json_binary(&msg)?,
         order_id: Some(order_id.clone()),
         path: Some(path),
-        memo: String::new(),
     };
 
     // Increment the sequence counter.
@@ -254,7 +253,6 @@ pub fn execute_take_swap(
         data: to_json_binary(&msg)?,
         order_id: None,
         path: None,
-        memo: String::new(),
     };
 
     let ibc_msg = IbcMsg::SendPacket {
@@ -306,7 +304,6 @@ pub fn execute_cancel_swap(
     let packet = AtomicSwapPacketData {
         r#type: SwapMessageType::CancelSwap,
         data: to_json_binary(&msg)?,
-        memo: String::new(),
         order_id: None,
         path: None,
     };
@@ -406,7 +403,6 @@ pub fn execute_make_bid(
     let packet = AtomicSwapPacketData {
         r#type: SwapMessageType::MakeBid,
         data: to_json_binary(&msg)?,
-        memo: String::new(),
         order_id: None,
         path: None,
     };
@@ -472,7 +468,6 @@ pub fn execute_take_bid(
     let packet = AtomicSwapPacketData {
         r#type: SwapMessageType::TakeBid,
         data: to_json_binary(&msg)?,
-        memo: String::new(),
         order_id: None,
         path: None,
     };
@@ -523,7 +518,6 @@ pub fn execute_cancel_bid(
     let packet = AtomicSwapPacketData {
         r#type: SwapMessageType::CancelBid,
         data: to_json_binary(&msg)?,
-        memo: String::new(),
         order_id: None,
         path: None,
     };
@@ -605,7 +599,6 @@ pub fn execute_update_bid(
     let packet = AtomicSwapPacketData {
         r#type: SwapMessageType::UpdateBid,
         data: to_json_binary(&msg)?,
-        memo: String::new(),
         order_id: None,
         path: None,
     };
